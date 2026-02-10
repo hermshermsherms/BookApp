@@ -1,0 +1,123 @@
+import Foundation
+
+/// Represents a book from the Google Books API
+struct Book: Identifiable, Codable, Equatable {
+    let id: String // Google Books volume ID
+    let title: String
+    let authors: [String]
+    let description: String?
+    let categories: [String]
+    let averageRating: Double?
+    let pageCount: Int?
+    let publishedDate: String?
+    let thumbnailURL: String?
+    let largeCoverURL: String?
+    let infoLink: String?
+
+    var authorDisplay: String {
+        authors.joined(separator: ", ")
+    }
+
+    var genreDisplay: String {
+        categories.first ?? "General"
+    }
+
+    var hook: String {
+        guard let desc = description else { return "" }
+        if desc.count > 120 {
+            return String(desc.prefix(117)) + "..."
+        }
+        return desc
+    }
+
+    var ratingDisplay: String {
+        guard let rating = averageRating else { return "—" }
+        return String(format: "%.1f", rating)
+    }
+
+    var pageCountDisplay: String {
+        guard let pages = pageCount else { return "—" }
+        return "\(pages) pages"
+    }
+
+    // MARK: - Purchase URLs
+
+    var amazonURL: URL? {
+        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
+        return URL(string: "https://www.amazon.com/s?k=\(query)&i=stripbooks")
+    }
+
+    var appleBooksURL: URL? {
+        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
+        return URL(string: "https://books.apple.com/us/book?term=\(query)")
+    }
+
+    var bookshopURL: URL? {
+        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
+        return URL(string: "https://bookshop.org/search?keywords=\(query)")
+    }
+}
+
+// MARK: - Google Books API Response Models
+
+struct GoogleBooksResponse: Codable {
+    let totalItems: Int?
+    let items: [GoogleBookItem]?
+}
+
+struct GoogleBookItem: Codable {
+    let id: String
+    let volumeInfo: VolumeInfo
+}
+
+struct VolumeInfo: Codable {
+    let title: String
+    let authors: [String]?
+    let description: String?
+    let categories: [String]?
+    let averageRating: Double?
+    let pageCount: Int?
+    let publishedDate: String?
+    let imageLinks: ImageLinks?
+    let infoLink: String?
+}
+
+struct ImageLinks: Codable {
+    let smallThumbnail: String?
+    let thumbnail: String?
+    let small: String?
+    let medium: String?
+    let large: String?
+
+    var bestQuality: String? {
+        large ?? medium ?? small ?? thumbnail ?? smallThumbnail
+    }
+
+    var thumbnailHTTPS: String? {
+        thumbnail?.replacingOccurrences(of: "http://", with: "https://")
+    }
+
+    var bestQualityHTTPS: String? {
+        bestQuality?.replacingOccurrences(of: "http://", with: "https://")
+    }
+}
+
+// MARK: - Mapping
+
+extension GoogleBookItem {
+    func toBook() -> Book {
+        Book(
+            id: id,
+            title: volumeInfo.title,
+            authors: volumeInfo.authors ?? ["Unknown Author"],
+            description: volumeInfo.description,
+            categories: volumeInfo.categories ?? [],
+            averageRating: volumeInfo.averageRating,
+            pageCount: volumeInfo.pageCount,
+            publishedDate: volumeInfo.publishedDate,
+            thumbnailURL: volumeInfo.imageLinks?.thumbnailHTTPS,
+            largeCoverURL: volumeInfo.imageLinks?.bestQualityHTTPS,
+            infoLink: volumeInfo.infoLink
+        )
+    }
+}

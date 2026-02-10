@@ -179,24 +179,6 @@ final class AuthService: ObservableObject {
         _ = userId
         clearSession()
     }
-    
-    // MARK: - Development Mode
-    
-    #if DEBUG
-    /// Sign in as a demo user for development testing
-    func signInAsDemoUser() {
-        let demoUserId = UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID()
-        let demoDisplayName = "Demo User"
-        let demoAccessToken = "demo_access_token"
-        
-        saveSession(
-            userId: demoUserId,
-            displayName: demoDisplayName,
-            accessToken: demoAccessToken,
-            refreshToken: nil
-        )
-    }
-    #endif
 }
 
 // MARK: - Errors
