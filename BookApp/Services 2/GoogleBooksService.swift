@@ -7,7 +7,7 @@ final class GoogleBooksService {
     private let baseURL = "https://www.googleapis.com/books/v1/volumes"
 
     // TODO: Move to environment config before release
-    private let apiKey = "YOUR_GOOGLE_BOOKS_API_KEY"
+    private let apiKey: String? = nil // Google Books API works without key for basic requests
 
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -53,8 +53,12 @@ final class GoogleBooksService {
             URLQueryItem(name: "orderBy", value: orderBy),
             URLQueryItem(name: "printType", value: "books"),
             URLQueryItem(name: "langRestrict", value: "en"),
-            URLQueryItem(name: "key", value: apiKey),
         ]
+        
+        // Only add API key if available
+        if let apiKey = apiKey {
+            components.queryItems?.append(URLQueryItem(name: "key", value: apiKey))
+        }
 
         guard let url = components.url else {
             throw GoogleBooksError.invalidURL
@@ -66,8 +70,11 @@ final class GoogleBooksService {
             throw GoogleBooksError.invalidResponse
         }
 
-        guard httpResponse.statusCode == 200 else {
+        guard 200...299 ~= httpResponse.statusCode else {
             if httpResponse.statusCode == 429 {
+                throw GoogleBooksError.rateLimited
+            } else if httpResponse.statusCode == 403 {
+                // API key might be invalid or quota exceeded
                 throw GoogleBooksError.rateLimited
             }
             throw GoogleBooksError.httpError(httpResponse.statusCode)
@@ -89,7 +96,12 @@ final class GoogleBooksService {
 
     /// Fetch detailed info for a single book by its Google Books ID
     func fetchBookDetails(id: String) async throws -> Book {
-        guard let url = URL(string: "\(baseURL)/\(id)?key=\(apiKey)") else {
+        var urlString = "\(baseURL)/\(id)"
+        if let apiKey = apiKey {
+            urlString += "?key=\(apiKey)"
+        }
+        
+        guard let url = URL(string: urlString) else {
             throw GoogleBooksError.invalidURL
         }
 

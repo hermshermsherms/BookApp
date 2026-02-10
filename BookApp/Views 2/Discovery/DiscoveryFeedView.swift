@@ -28,12 +28,15 @@ struct DiscoveryFeedView: View {
                     .rotationEffect(.degrees(Double(dragOffset.width) / 20))
                     .opacity(cardOpacity)
                     .gesture(dragGesture)
-                    .onTapGesture(count: 2) {
-                        viewModel.doubleTap()
-                    }
                     .onTapGesture(count: 1) {
                         viewModel.singleTap()
                     }
+                    .simultaneousGesture(
+                        TapGesture(count: 2)
+                            .onEnded {
+                                viewModel.doubleTap()
+                            }
+                    )
                     .animation(.spring(response: 0.4, dampingFraction: 0.7), value: dragOffset)
 
                 // Like animation overlay

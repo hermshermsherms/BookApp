@@ -2,12 +2,13 @@ import SwiftUI
 
 struct BookCardView: View {
     let book: Book
+    @State private var imageURL: URL?
 
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .bottom) {
                 // Background — book cover
-                AsyncImage(url: URL(string: book.largeCoverURL ?? book.thumbnailURL ?? "")) { phase in
+                AsyncImage(url: imageURL) { phase in
                     switch phase {
                     case .success(let image):
                         image
@@ -101,6 +102,9 @@ struct BookCardView: View {
             }
         }
         .ignoresSafeArea()
+        .onAppear {
+            imageURL = URL(string: book.largeCoverURL ?? book.thumbnailURL ?? "")
+        }
     }
 
     @ViewBuilder

@@ -195,39 +195,182 @@ Want to Read → Reading → Read
 
 ---
 
-## 11. Implementation Status
+## 11. Implementation Plan & Milestones
 
-### Current Status: **Ready for Development**
+### Current Status: **Project Scaffolded - Ready for Feature Implementation**
 *Last Updated: 2026-02-10*
 
-**Completed:**
+**Foundation Completed:**
 - [x] PRD finalized and documented
 - [x] Git repository initialized
 - [x] Xcode project structure created
 - [x] Basic SwiftUI app template set up
-- [x] All MVVM folders and files created
-- [x] All source files properly linked in Xcode project
-- [x] Project compiles and is ready to run
+- [x] MVVM architecture scaffolded
+- [x] Development mode authentication bypass
 
-**Ready to Start:**
-- 📱 **The project is now fully set up and can be opened in Xcode**
-- 🔧 **All views, models, and services are scaffolded**
-- 🎯 **Tab navigation (Discovery, Library, Profile) is implemented**
-- 🚀 **Development mode authentication bypass added**
-
-**Next Steps:**
-1. Configure Supabase project and database schema
-2. Set up Google Books API key  
-3. Add real book data integration
-4. Style with the warm, bookish theme
-5. Configure Apple Sign In for production
+**Current Reality Check:**
+- ⚠️ **Project structure exists but core features are NOT implemented**
+- ⚠️ **Views are placeholder shells without real functionality**
+- ⚠️ **No actual book data integration or user flows working**
 
 ---
 
-## 12. Open Items
+## 12. Feature-by-Feature Implementation Milestones
 
-- [ ] Finalize app name and branding
+### **Milestone 1: Discovery Feed MVP** 🎯 *[Current Priority]*
+**Goal:** Users can swipe through real books and see book details
+
+**Tasks:**
+1. **Google Books API Integration**
+   - Set up API key and service layer
+   - Implement book search and trending books fetching
+   - Test API responses and error handling
+
+2. **Discovery Feed Core Functionality**
+   - Display real book data in swipeable cards
+   - Implement swipe gestures (up/next, left/dislike, tap/details)
+   - Add book detail view with real data
+   - Implement basic feed logic (popular books rotation)
+
+3. **Book Detail View**
+   - Full synopsis, author info, ratings display
+   - Purchase sheet with affiliate links (mock for now)
+
+**Definition of Done:**
+- [ ] User can see and swipe through real books
+- [ ] Detail view shows complete book information
+- [ ] Basic navigation and gestures work smoothly
+- [ ] No placeholder data visible to user
+
+---
+
+### **Milestone 2: Authentication & User State** 
+**Goal:** Users can sign in and their actions persist
+
+**Tasks:**
+1. **Supabase Setup & Integration**
+   - Set up Supabase project and database schema
+   - Configure authentication service
+   - Test user creation and session management
+
+2. **Apple Sign In Production Setup**
+   - Configure Apple Developer account capabilities
+   - Replace demo user with real Apple Sign In
+   - Handle authentication states and errors
+
+**Definition of Done:**
+- [ ] Real Apple Sign In working in production
+- [ ] User sessions persist across app restarts
+- [ ] User data stored and retrieved from Supabase
+
+---
+
+### **Milestone 3: Library & Book Management**
+**Goal:** Users can save, organize, and review books
+
+**Tasks:**
+1. **Library Core Functionality**
+   - Implement Want to Read / Reading / Read tabs
+   - Book status management and transitions
+   - Manual book search and add functionality
+
+2. **Review System**
+   - 1-5 star rating system
+   - Text review creation and editing
+   - Review display and management
+
+**Definition of Done:**
+- [ ] Users can save books from Discovery to Library
+- [ ] Book status changes work correctly
+- [ ] Review system fully functional
+- [ ] Manual book addition works
+
+---
+
+### **Milestone 4: Profile & User Experience**
+**Goal:** Complete user profile and statistics
+
+**Tasks:**
+1. **Profile Implementation**
+   - Display user stats (books read, reviews written)
+   - Account management (delete account)
+   - Settings and preferences
+
+2. **Theme & Polish**
+   - Implement warm, bookish visual design
+   - Smooth animations and transitions
+   - Performance optimization
+
+**Definition of Done:**
+- [ ] Profile shows accurate user statistics
+- [ ] Visual design matches PRD specifications
+- [ ] App feels polished and performant
+
+---
+
+### **Milestone 5: Production Ready**
+**Goal:** App ready for App Store submission
+
+**Tasks:**
+1. **Affiliate Revenue Setup**
+   - Amazon Associates integration
+   - Apple Books affiliate links
+   - Purchase flow testing
+
+2. **Production Polish**
+   - Error handling and edge cases
+   - App Store assets and metadata
+   - Final testing and bug fixes
+
+**Definition of Done:**
+- [ ] Affiliate links generate revenue
+- [ ] App passes App Store review guidelines
+- [ ] All core user flows tested and working
+
+---
+
+## 13. Implementation Best Practices
+
+### **Lessons Learned from Initial Implementation**
+
+**❌ What NOT to do:**
+- **Don't create scaffolding without functionality** - Empty view files with placeholder content provide no user value
+- **Don't claim features are "implemented" when they're just structured** - Users care about working functionality, not architecture
+- **Don't build everything at once** - This leads to nothing being fully functional
+- **Don't skip testing each feature** - Untested features often have basic issues that block user flows
+
+**✅ What TO do:**
+- **Implement one complete user flow at a time** - Users should be able to complete a full journey (e.g., discover → view → save a book)
+- **Start with core functionality, not polish** - Get the basic feature working before adding animations or perfect styling  
+- **Test each milestone thoroughly** - Ensure the feature works end-to-end before moving to the next
+- **Use real data as early as possible** - Mock data is fine temporarily, but integrate real APIs quickly
+- **Focus on user experience over technical architecture** - A working app with less perfect code is better than perfect code that doesn't work
+
+### **Milestone Success Criteria**
+Each milestone should meet these criteria before moving to the next:
+- ✅ **Functionally complete** - All described user actions work
+- ✅ **Tested end-to-end** - Full user flow verified manually
+- ✅ **No placeholder content** - Real data displayed to users
+- ✅ **Error handling** - Basic error states handled gracefully
+- ✅ **Commits and documentation** - Changes committed with clear descriptions
+
+### **Implementation Order Principles**
+1. **Start with the most valuable user flow** (Discovery feed for this app)
+2. **Build vertically, not horizontally** (Complete one feature fully vs partial implementation across features)
+3. **Integrate external dependencies early** (APIs, authentication) to surface integration issues
+4. **Polish comes last** (Visual design and animations after functionality works)
+
+---
+
+## 14. Open Items
+
+**For Milestone 1 (Discovery Feed MVP):**
 - [ ] Google Books API key setup and rate limit planning
-- [ ] Affiliate program signup (Amazon Associates, Apple Books)
+- [ ] Implement real book data fetching and display
+- [ ] Add swipe gestures and navigation
+
+**For Later Milestones:**
+- [ ] Finalize app name and branding
+- [ ] Affiliate program signup (Amazon Associates, Apple Books)  
 - [ ] Supabase project setup and schema migration
 - [ ] App Store provisioning and certificates

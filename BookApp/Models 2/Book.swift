@@ -43,17 +43,20 @@ struct Book: Identifiable, Codable, Equatable {
     // MARK: - Purchase URLs
 
     var amazonURL: URL? {
-        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
+        guard let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              !query.isEmpty else { return nil }
         return URL(string: "https://www.amazon.com/s?k=\(query)&i=stripbooks")
     }
 
     var appleBooksURL: URL? {
-        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
+        guard let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              !query.isEmpty else { return nil }
         return URL(string: "https://books.apple.com/us/book?term=\(query)")
     }
 
     var bookshopURL: URL? {
-        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
+        guard let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              !query.isEmpty else { return nil }
         return URL(string: "https://bookshop.org/search?keywords=\(query)")
     }
 }
