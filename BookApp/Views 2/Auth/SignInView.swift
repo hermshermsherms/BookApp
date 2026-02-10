@@ -29,16 +29,28 @@ struct SignInView: View {
 
                 Spacer()
 
-                // Apple Sign In Button
-                SignInWithAppleButton(.signIn) { request in
-                    request.requestedScopes = [.fullName, .email]
-                } onCompletion: { result in
-                    viewModel.handleSignIn(result: result)
+                VStack(spacing: Theme.paddingMedium) {
+                    // Apple Sign In Button
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in
+                        viewModel.handleSignIn(result: result)
+                    }
+                    .signInWithAppleButtonStyle(.black)
+                    .frame(height: 52)
+                    .cornerRadius(Theme.cornerRadiusMedium)
+                    .padding(.horizontal, Theme.paddingLarge)
+                    
+                    // Development mode bypass
+                    #if DEBUG
+                    Button("Continue as Demo User") {
+                        viewModel.signInAsDemoUser()
+                    }
+                    .font(Theme.body(16))
+                    .foregroundColor(Theme.accent)
+                    .padding(.horizontal, Theme.paddingLarge)
+                    #endif
                 }
-                .signInWithAppleButtonStyle(.black)
-                .frame(height: 52)
-                .cornerRadius(Theme.cornerRadiusMedium)
-                .padding(.horizontal, Theme.paddingLarge)
 
                 if viewModel.isLoading {
                     ProgressView()

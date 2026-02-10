@@ -49,4 +49,21 @@ final class AuthViewModel: ObservableObject {
             self.isLoading = false
         }
     }
+    
+    // MARK: - Development Mode
+    
+    #if DEBUG
+    func signInAsDemoUser() {
+        isLoading = true
+        error = nil
+        
+        Task {
+            authService.signInAsDemoUser()
+            await MainActor.run {
+                self.isAuthenticated = true
+                self.isLoading = false
+            }
+        }
+    }
+    #endif
 }
