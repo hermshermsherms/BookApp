@@ -28,6 +28,7 @@ struct BookCardView: View {
                         fallbackCover(size: geometry.size)
                     }
                 }
+                .id(book.id + (book.largeCoverURL ?? book.thumbnailURL ?? ""))
 
                 // Gradient overlay at bottom for text readability
                 LinearGradient(

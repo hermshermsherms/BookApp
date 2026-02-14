@@ -4,6 +4,8 @@ import Foundation
 @MainActor
 final class DiscoveryViewModel: ObservableObject {
     @Published var currentBook: Book?
+    @Published var nextBook: Book?
+    @Published var previousBook: Book?
     @Published var isLoading = false
     @Published var error: String?
     @Published var showPurchaseSheet = false
@@ -11,6 +13,7 @@ final class DiscoveryViewModel: ObservableObject {
     @Published var likeAnimationTrigger = false
 
     private var bookQueue: [Book] = []
+    private var bookHistory: [Book] = [] // Stack of previously seen books
     private var seenBookIds: Set<String> = []
     private let booksService = GoogleBooksService.shared
     private let supabaseService = SupabaseService.shared
@@ -57,11 +60,25 @@ final class DiscoveryViewModel: ObservableObject {
     // MARK: - Advance Feed
 
     private func advanceToNext() {
+        // Save current book to history before advancing
+        if let current = currentBook {
+            bookHistory.append(current)
+            // Limit history to last 20 books to prevent memory issues
+            if bookHistory.count > 20 {
+                bookHistory.removeFirst()
+            }
+        }
+        
         if bookQueue.isEmpty {
             currentBook = nil
-            return
+            nextBook = nil
+        } else {
+            currentBook = bookQueue.removeFirst()
+            nextBook = bookQueue.first
         }
-        currentBook = bookQueue.removeFirst()
+        
+        // Set previous book for preview
+        previousBook = bookHistory.last
 
         // Pre-fetch more if running low
         if bookQueue.count < prefetchThreshold {
@@ -69,20 +86,37 @@ final class DiscoveryViewModel: ObservableObject {
             prefetchTask = Task { [weak self] in
                 guard let self = self else { return }
                 try? await self.fetchMoreBooks()
+                // Update next book after fetching more
+                await MainActor.run {
+                    self.nextBook = self.bookQueue.first
+                }
             }
         }
+    }
+    
+    private func goToPrevious() {
+        guard !bookHistory.isEmpty else { return }
+        
+        // Move current book back to the front of the queue
+        if let current = currentBook {
+            bookQueue.insert(current, at: 0)
+        }
+        
+        // Restore the previous book as current
+        currentBook = bookHistory.removeLast()
+        nextBook = bookQueue.first
+        previousBook = bookHistory.last
     }
 
     // MARK: - Swipe Actions
 
-    func swipeLeft() {
-        guard let book = currentBook else { return }
-        recordSwipe(book: book, action: .dislike)
-        advanceToNext()
-    }
 
     func swipeUp() {
         advanceToNext()
+    }
+    
+    func swipeDown() {
+        goToPrevious()
     }
 
     func doubleTap() {
@@ -94,23 +128,12 @@ final class DiscoveryViewModel: ObservableObject {
             self.likeAnimationTrigger = false
         }
 
+        // Save to library but don't advance - just show the like animation
         recordSwipe(book: book, action: .like)
         saveToLibrary(book: book)
-        advanceToNext()
+        // Note: Don't advance to next book on double tap - just save it
     }
 
-    func swipeRight() {
-        guard let book = currentBook else { return }
-        recordSwipe(book: book, action: .buy)
-        saveToLibrary(book: book)
-        showPurchaseSheet = true
-        // Don't advance yet — user is viewing purchase options
-    }
-
-    func dismissPurchaseSheet() {
-        showPurchaseSheet = false
-        advanceToNext()
-    }
 
     func singleTap() {
         guard currentBook != nil else { return }

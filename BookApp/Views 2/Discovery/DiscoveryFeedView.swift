@@ -4,8 +4,14 @@ struct DiscoveryFeedView: View {
     @StateObject private var viewModel = DiscoveryViewModel()
     @State private var dragOffset: CGSize = .zero
     @State private var cardOpacity: Double = 1.0
+    @State private var dragDirection: DragDirection = .none
 
     private let swipeThreshold: CGFloat = 100
+    private let directionThreshold: CGFloat = 30 // Threshold to lock into a direction
+    
+    enum DragDirection {
+        case none, vertical, horizontal
+    }
 
     var body: some View {
         ZStack {
@@ -22,22 +28,55 @@ struct DiscoveryFeedView: View {
                         .foregroundColor(Theme.secondaryText)
                 }
             } else if let book = viewModel.currentBook {
-                // Book card with gesture handling
-                BookCardView(book: book)
-                    .offset(x: dragOffset.width, y: dragOffset.height)
-                    .rotationEffect(.degrees(Double(dragOffset.width) / 20))
-                    .opacity(cardOpacity)
-                    .gesture(dragGesture)
-                    .onTapGesture(count: 1) {
-                        viewModel.singleTap()
-                    }
-                    .simultaneousGesture(
-                        TapGesture(count: 2)
-                            .onEnded {
+                GeometryReader { geometry in
+                    ZStack {
+                        // Previous book preview (above, visible when swiping down)
+                        if let previousBook = viewModel.previousBook {
+                            BookCardView(book: previousBook)
+                                .id("previous-\(previousBook.id)")
+                                .offset(y: dragDirection == .vertical && dragOffset.height > 0 ? 
+                                       dragOffset.height - geometry.size.height : -geometry.size.height)
+                                .opacity(dragDirection == .vertical && dragOffset.height > 0 ? 
+                                        min(1.0, dragOffset.height / 150) : 0)
+                                .allowsHitTesting(false) // Prevent interaction with preview
+                        }
+                        
+                        // Next book preview (slides up from bottom as you swipe up)
+                        if let nextBook = viewModel.nextBook {
+                            BookCardView(book: nextBook)
+                                .id("next-\(nextBook.id)")
+                                .frame(width: geometry.size.width, height: geometry.size.height)
+                                .offset(y: dragDirection == .vertical && dragOffset.height < 0 ? 
+                                       geometry.size.height + dragOffset.height : geometry.size.height)
+                                .opacity(dragDirection == .vertical && dragOffset.height < 0 ? 
+                                        min(1.0, abs(dragOffset.height) / 200) : 0)
+                                .allowsHitTesting(false) // Prevent interaction with preview
+                        }
+                    
+                        // Current book card with gesture handling
+                        BookCardView(book: book)
+                            .id(book.id) // Force view recreation when book changes
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .offset(y: dragOffset.height)
+                            .opacity(cardOpacity)
+                            .onTapGesture(count: 2) {
                                 viewModel.doubleTap()
                             }
-                    )
-                    .animation(.spring(response: 0.4, dampingFraction: 0.7), value: dragOffset)
+                            .onTapGesture(count: 1) {
+                                viewModel.singleTap()
+                            }
+                            .gesture(dragGesture)
+                    }
+                }
+                
+                // Pre-load next book image (hidden)
+                if let nextBook = viewModel.nextBook {
+                    AsyncImage(url: URL(string: nextBook.largeCoverURL ?? nextBook.thumbnailURL ?? "")) { _ in
+                        EmptyView()
+                    }
+                    .frame(width: 0, height: 0)
+                    .opacity(0)
+                }
 
                 // Like animation overlay
                 if viewModel.likeAnimationTrigger {
@@ -85,24 +124,17 @@ struct DiscoveryFeedView: View {
                 }
             }
         }
-        .sheet(isPresented: $viewModel.showPurchaseSheet) {
-            if let book = viewModel.currentBook {
-                PurchaseSheetView(book: book) {
-                    viewModel.dismissPurchaseSheet()
-                }
-                .presentationDetents([.medium])
-            }
-        }
         .sheet(isPresented: $viewModel.showDetailView) {
             if let book = viewModel.currentBook {
                 BookDetailView(book: book, onLike: {
                     viewModel.doubleTap()
                     viewModel.showDetailView = false
                 }, onBuy: {
+                    // Open purchase sheet from detail view
                     viewModel.showDetailView = false
-                    viewModel.swipeRight()
+                    // Could add purchase functionality here if needed
                 }, onDislike: {
-                    viewModel.swipeLeft()
+                    // Close detail view - no action needed
                     viewModel.showDetailView = false
                 })
             }
@@ -117,45 +149,33 @@ struct DiscoveryFeedView: View {
     private var dragGesture: some Gesture {
         DragGesture()
             .onChanged { value in
-                dragOffset = value.translation
-                // Fade card as it's dragged further
-                let distance = abs(value.translation.width) + abs(value.translation.height)
-                cardOpacity = max(0.5, 1.0 - (distance / 500))
+                let translation = value.translation
+                
+                // Only allow vertical movement for feed-like behavior
+                if abs(translation.height) > abs(translation.width) {
+                    // This is primarily a vertical swipe
+                    dragOffset = CGSize(width: 0, height: translation.height)
+                    dragDirection = .vertical
+                    // Fade card as it's dragged further
+                    let distance = abs(translation.height)
+                    cardOpacity = max(0.6, 1.0 - (distance / 400))
+                } else {
+                    // Ignore horizontal movement - no left/right swipes
+                    dragOffset = .zero
+                    dragDirection = .none
+                }
             }
             .onEnded { value in
-                let horizontal = value.translation.width
                 let vertical = value.translation.height
 
-                if horizontal < -swipeThreshold {
-                    // Swipe left — dislike
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        dragOffset = CGSize(width: -500, height: 0)
-                        cardOpacity = 0
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        resetCard()
-                        viewModel.swipeLeft()
-                    }
-                } else if horizontal > swipeThreshold {
-                    // Swipe right — buy
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        dragOffset = CGSize(width: 500, height: 0)
-                        cardOpacity = 0
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        resetCard()
-                        viewModel.swipeRight()
-                    }
-                } else if vertical < -swipeThreshold {
-                    // Swipe up — next
-                    withAnimation(.easeOut(duration: 0.3)) {
-                        dragOffset = CGSize(width: 0, height: -600)
-                        cardOpacity = 0
-                    }
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                        resetCard()
-                        viewModel.swipeUp()
-                    }
+                if vertical < -swipeThreshold {
+                    // Swipe up — next (immediate transition)
+                    viewModel.swipeUp()
+                    resetCard()
+                } else if vertical > swipeThreshold {
+                    // Swipe down — previous (immediate transition)  
+                    viewModel.swipeDown()
+                    resetCard()
                 } else {
                     // Snap back
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
@@ -169,45 +189,14 @@ struct DiscoveryFeedView: View {
     private func resetCard() {
         dragOffset = .zero
         cardOpacity = 1.0
+        dragDirection = .none
     }
 
     // MARK: - Swipe Indicators
 
-    @ViewBuilder
+    @ViewBuilder  
     private var swipeIndicators: some View {
-        // Left indicator (dislike)
-        if dragOffset.width < -30 {
-            HStack {
-                Spacer()
-                VStack {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(Theme.negative)
-                    Text("SKIP")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Theme.negative)
-                }
-                .padding(.trailing, 40)
-                .opacity(min(1, abs(dragOffset.width) / swipeThreshold))
-                Spacer().frame(width: 40)
-            }
-        }
-
-        // Right indicator (buy)
-        if dragOffset.width > 30 {
-            HStack {
-                Spacer().frame(width: 40)
-                VStack {
-                    Image(systemName: "cart.circle.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(Theme.positive)
-                    Text("BUY")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(Theme.positive)
-                }
-                .padding(.leading, 40)
-                Spacer()
-            }
-        }
+        // No swipe indicators needed - clean interface
+        EmptyView()
     }
 }
