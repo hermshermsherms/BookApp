@@ -3,14 +3,28 @@ import Foundation
 
 @MainActor
 final class DiscoveryViewModel: ObservableObject {
-    @Published var currentBook: Book?
-    @Published var nextBook: Book?
-    @Published var previousBook: Book?
+    @Published var books: [Book] = []
+    @Published var currentIndex: Int = 0
     @Published var isLoading = false
     @Published var error: String?
     @Published var showPurchaseSheet = false
     @Published var showDetailView = false
     @Published var likeAnimationTrigger = false
+    
+    var currentBook: Book? {
+        guard currentIndex < books.count else { return nil }
+        return books[currentIndex]
+    }
+    
+    var nextBook: Book? {
+        guard currentIndex + 1 < books.count else { return nil }
+        return books[currentIndex + 1]
+    }
+    
+    var previousBook: Book? {
+        guard currentIndex > 0 else { return nil }
+        return books[currentIndex - 1]
+    }
 
     private var bookQueue: [Book] = []
     private var bookHistory: [Book] = [] // Stack of previously seen books
@@ -38,12 +52,12 @@ final class DiscoveryViewModel: ObservableObject {
             }
             
             try await fetchMoreBooks()
-            advanceToNext()
+            currentIndex = 0
         } catch {
             // If Google Books fails, use mock data and set error message
             self.error = "Unable to fetch new books. Showing sample content."
-            bookQueue = mockBooks()
-            advanceToNext()
+            books = mockBooks()
+            currentIndex = 0
         }
 
         isLoading = false
@@ -52,60 +66,47 @@ final class DiscoveryViewModel: ObservableObject {
     // MARK: - Fetch More Books
 
     private func fetchMoreBooks() async throws {
-        let books = try await booksService.fetchTrendingBooks(maxResults: 10)
-        let newBooks = books.filter { !seenBookIds.contains($0.id) }
-        bookQueue.append(contentsOf: newBooks)
+        let newBooksFromAPI = try await booksService.fetchTrendingBooks(maxResults: 10)
+        let filteredBooks = newBooksFromAPI.filter { !seenBookIds.contains($0.id) }
+        
+        await MainActor.run {
+            books.append(contentsOf: filteredBooks)
+        }
     }
 
-    // MARK: - Advance Feed
-
-    private func advanceToNext() {
-        // Save current book to history before advancing
-        if let current = currentBook {
-            bookHistory.append(current)
-            // Limit history to last 20 books to prevent memory issues
-            if bookHistory.count > 20 {
-                bookHistory.removeFirst()
-            }
-        }
+    // MARK: - Index Management
+    
+    func updateCurrentIndex(_ newIndex: Int) {
+        currentIndex = newIndex
         
-        if bookQueue.isEmpty {
-            currentBook = nil
-            nextBook = nil
-        } else {
-            currentBook = bookQueue.removeFirst()
-            nextBook = bookQueue.first
-        }
-        
-        // Set previous book for preview
-        previousBook = bookHistory.last
-
-        // Pre-fetch more if running low
-        if bookQueue.count < prefetchThreshold {
+        // Pre-fetch more books if running low
+        if currentIndex >= books.count - prefetchThreshold {
             prefetchTask?.cancel()
             prefetchTask = Task { [weak self] in
                 guard let self = self else { return }
                 try? await self.fetchMoreBooks()
-                // Update next book after fetching more
-                await MainActor.run {
-                    self.nextBook = self.bookQueue.first
+            }
+        }
+    }
+    
+    private func advanceToNext() {
+        if currentIndex < books.count - 1 {
+            currentIndex += 1
+        } else {
+            // At the end, try to load more books
+            Task {
+                try? await fetchMoreBooks()
+                if currentIndex < books.count - 1 {
+                    currentIndex += 1
                 }
             }
         }
     }
     
     private func goToPrevious() {
-        guard !bookHistory.isEmpty else { return }
-        
-        // Move current book back to the front of the queue
-        if let current = currentBook {
-            bookQueue.insert(current, at: 0)
+        if currentIndex > 0 {
+            currentIndex -= 1
         }
-        
-        // Restore the previous book as current
-        currentBook = bookHistory.removeLast()
-        nextBook = bookQueue.first
-        previousBook = bookHistory.last
     }
 
     // MARK: - Swipe Actions
@@ -161,7 +162,7 @@ final class DiscoveryViewModel: ObservableObject {
 
         Task { [weak self] in
             guard let self = self else { return }
-            try? await self.supabaseService.addUserBook(
+            _ = try? await self.supabaseService.addUserBook(
                 userId: userId,
                 googleBooksId: book.id,
                 status: .wantToRead

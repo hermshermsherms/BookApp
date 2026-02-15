@@ -2,21 +2,14 @@ import SwiftUI
 
 struct DiscoveryFeedView: View {
     @StateObject private var viewModel = DiscoveryViewModel()
-    @State private var dragOffset: CGSize = .zero
-    @State private var cardOpacity: Double = 1.0
-    @State private var dragDirection: DragDirection = .none
-
-    private let swipeThreshold: CGFloat = 100
-    private let directionThreshold: CGFloat = 30 // Threshold to lock into a direction
-    
-    enum DragDirection {
-        case none, vertical, horizontal
-    }
+    @State private var currentPage: Int = 0
+    @State private var dragOffset: CGFloat = 0
+    @State private var isDragging = false
 
     var body: some View {
         ZStack {
-            Theme.background
-                .ignoresSafeArea()
+            Color.black
+                .ignoresSafeArea(.all)
 
             if viewModel.isLoading {
                 VStack(spacing: 16) {
@@ -25,47 +18,76 @@ struct DiscoveryFeedView: View {
                         .scaleEffect(1.5)
                     Text("Finding books for you...")
                         .font(Theme.body())
-                        .foregroundColor(Theme.secondaryText)
+                        .foregroundColor(.white.opacity(0.7))
                 }
-            } else if let book = viewModel.currentBook {
-                GeometryReader { geometry in
-                    ZStack {
-                        // Previous book preview (above, visible when swiping down)
-                        if let previousBook = viewModel.previousBook {
-                            BookCardView(book: previousBook)
-                                .id("previous-\(previousBook.id)")
-                                .offset(y: dragDirection == .vertical && dragOffset.height > 0 ? 
-                                       dragOffset.height - geometry.size.height : -geometry.size.height)
-                                .opacity(dragDirection == .vertical && dragOffset.height > 0 ? 
-                                        min(1.0, dragOffset.height / 150) : 0)
-                                .allowsHitTesting(false) // Prevent interaction with preview
-                        }
-                        
-                        // Next book preview (slides up from bottom as you swipe up)
-                        if let nextBook = viewModel.nextBook {
-                            BookCardView(book: nextBook)
-                                .id("next-\(nextBook.id)")
-                                .frame(width: geometry.size.width, height: geometry.size.height)
-                                .offset(y: dragDirection == .vertical && dragOffset.height < 0 ? 
-                                       geometry.size.height + dragOffset.height : geometry.size.height)
-                                .opacity(dragDirection == .vertical && dragOffset.height < 0 ? 
-                                        min(1.0, abs(dragOffset.height) / 200) : 0)
-                                .allowsHitTesting(false) // Prevent interaction with preview
-                        }
-                    
-                        // Current book card with gesture handling
-                        BookCardView(book: book)
-                            .id(book.id) // Force view recreation when book changes
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .offset(y: dragOffset.height)
-                            .opacity(cardOpacity)
-                            .onTapGesture(count: 2) {
-                                viewModel.doubleTap()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
+            } else if !viewModel.books.isEmpty {
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        LazyVStack(spacing: 0) {
+                            ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
+                                BookCardView(book: book)
+                                    .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
+                                    .background(Color.black)
+                                    .clipped()
+                                    .id(index)
+                                    .onTapGesture(count: 2) {
+                                        viewModel.doubleTap()
+                                    }
+                                    .onTapGesture(count: 1) {
+                                        viewModel.singleTap()
+                                    }
                             }
-                            .onTapGesture(count: 1) {
-                                viewModel.singleTap()
+                        }
+                    }
+                    .scrollDisabled(true) // Disable ScrollView's natural scrolling
+                    .ignoresSafeArea(.all)
+                    .gesture(
+                        DragGesture()
+                            .onChanged { _ in
+                                isDragging = true
                             }
-                            .gesture(dragGesture)
+                            .onEnded { value in
+                                isDragging = false
+                                
+                                let threshold: CGFloat = 50 // Minimum distance to trigger page change
+                                let verticalMovement = value.translation.height
+                                
+                                var targetPage = currentPage
+                                
+                                if verticalMovement < -threshold && currentPage < viewModel.books.count - 1 {
+                                    // Swipe up - go to next book
+                                    targetPage = currentPage + 1
+                                } else if verticalMovement > threshold && currentPage > 0 {
+                                    // Swipe down - go to previous book
+                                    targetPage = currentPage - 1
+                                }
+                                
+                                // Only move if target page changed
+                                if targetPage != currentPage {
+                                    currentPage = targetPage
+                                    viewModel.updateCurrentIndex(targetPage)
+                                    
+                                    withAnimation(.spring(response: 0.5, dampingFraction: 0.8)) {
+                                        proxy.scrollTo(targetPage, anchor: .top)
+                                    }
+                                }
+                            }
+                    )
+                    .onAppear {
+                        currentPage = viewModel.currentIndex
+                        DispatchQueue.main.async {
+                            proxy.scrollTo(currentPage, anchor: .top)
+                        }
+                    }
+                    .onChange(of: viewModel.currentIndex) { newIndex in
+                        if newIndex != currentPage {
+                            currentPage = newIndex
+                            withAnimation(.spring(response: 0.6, dampingFraction: 0.8)) {
+                                proxy.scrollTo(newIndex, anchor: .top)
+                            }
+                        }
                     }
                 }
                 
@@ -88,17 +110,14 @@ struct DiscoveryFeedView: View {
                         .zIndex(10)
                 }
 
-                // Swipe direction indicators
-                swipeIndicators
-
             } else if let error = viewModel.error {
                 VStack(spacing: 16) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.system(size: 40))
-                        .foregroundColor(Theme.muted)
+                        .foregroundColor(.white.opacity(0.6))
                     Text(error)
                         .font(Theme.body())
-                        .foregroundColor(Theme.secondaryText)
+                        .foregroundColor(.white.opacity(0.8))
                         .multilineTextAlignment(.center)
                     Button("Try Again") {
                         Task { await viewModel.loadFeed() }
@@ -106,22 +125,26 @@ struct DiscoveryFeedView: View {
                     .primaryButtonStyle()
                 }
                 .padding()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
             } else {
                 VStack(spacing: 16) {
                     Image(systemName: "books.vertical")
                         .font(.system(size: 40))
-                        .foregroundColor(Theme.muted)
+                        .foregroundColor(.white.opacity(0.6))
                     Text("No more books right now")
                         .font(Theme.serifTitle(20))
-                        .foregroundColor(Theme.primaryText)
+                        .foregroundColor(.white)
                     Text("Check back later for new recommendations")
                         .font(Theme.body(14))
-                        .foregroundColor(Theme.secondaryText)
+                        .foregroundColor(.white.opacity(0.7))
                     Button("Refresh") {
                         Task { await viewModel.loadFeed() }
                     }
                     .primaryButtonStyle()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.black)
             }
         }
         .sheet(isPresented: $viewModel.showDetailView) {
@@ -144,59 +167,4 @@ struct DiscoveryFeedView: View {
         }
     }
 
-    // MARK: - Drag Gesture
-
-    private var dragGesture: some Gesture {
-        DragGesture()
-            .onChanged { value in
-                let translation = value.translation
-                
-                // Only allow vertical movement for feed-like behavior
-                if abs(translation.height) > abs(translation.width) {
-                    // This is primarily a vertical swipe
-                    dragOffset = CGSize(width: 0, height: translation.height)
-                    dragDirection = .vertical
-                    // Fade card as it's dragged further
-                    let distance = abs(translation.height)
-                    cardOpacity = max(0.6, 1.0 - (distance / 400))
-                } else {
-                    // Ignore horizontal movement - no left/right swipes
-                    dragOffset = .zero
-                    dragDirection = .none
-                }
-            }
-            .onEnded { value in
-                let vertical = value.translation.height
-
-                if vertical < -swipeThreshold {
-                    // Swipe up — next (immediate transition)
-                    viewModel.swipeUp()
-                    resetCard()
-                } else if vertical > swipeThreshold {
-                    // Swipe down — previous (immediate transition)  
-                    viewModel.swipeDown()
-                    resetCard()
-                } else {
-                    // Snap back
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        dragOffset = .zero
-                        cardOpacity = 1.0
-                    }
-                }
-            }
-    }
-
-    private func resetCard() {
-        dragOffset = .zero
-        cardOpacity = 1.0
-        dragDirection = .none
-    }
-
-    // MARK: - Swipe Indicators
-
-    @ViewBuilder  
-    private var swipeIndicators: some View {
-        // No swipe indicators needed - clean interface
-        EmptyView()
-    }
 }
