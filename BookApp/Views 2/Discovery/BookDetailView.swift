@@ -10,6 +10,16 @@ struct BookDetailView: View {
     @State private var isLoadingSimilar = false
     @Environment(\.dismiss) private var dismiss
 
+    private var highResImageURL: URL? {
+        // Prioritize large cover URL, fallback to thumbnail
+        if let largeCoverURL = book.largeCoverURL {
+            return URL(string: largeCoverURL)
+        } else if let thumbnailURL = book.thumbnailURL {
+            return URL(string: thumbnailURL)
+        }
+        return nil
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -17,7 +27,7 @@ struct BookDetailView: View {
                     // Cover image
                     HStack {
                         Spacer()
-                        AsyncImage(url: URL(string: book.largeCoverURL ?? book.thumbnailURL ?? "")) { phase in
+                        AsyncImage(url: highResImageURL) { phase in
                             switch phase {
                             case .success(let image):
                                 image
@@ -25,7 +35,6 @@ struct BookDetailView: View {
                                     .aspectRatio(contentMode: .fit)
                                     .frame(maxHeight: 350)
                                     .cornerRadius(Theme.cornerRadiusMedium)
-                                    .shadow(color: Theme.espresso.opacity(0.2), radius: 12, y: 8)
                             case .failure, .empty:
                                 RoundedRectangle(cornerRadius: Theme.cornerRadiusMedium)
                                     .fill(Theme.parchment)
@@ -39,6 +48,7 @@ struct BookDetailView: View {
                                 EmptyView()
                             }
                         }
+                        .shadow(color: Theme.espresso.opacity(0.2), radius: 12, y: 8)
                         Spacer()
                     }
                     .padding(.top, Theme.paddingMedium)
@@ -152,10 +162,16 @@ struct BookDetailView: View {
                                                         .aspectRatio(contentMode: .fill)
                                                         .frame(width: 90, height: 135)
                                                         .cornerRadius(Theme.cornerRadiusSmall)
+                                                        .clipped()
                                                 case .failure, .empty:
                                                     RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall)
                                                         .fill(Theme.parchment)
                                                         .frame(width: 90, height: 135)
+                                                        .overlay(
+                                                            Image(systemName: "book.closed.fill")
+                                                                .font(.system(size: 24))
+                                                                .foregroundColor(Theme.muted)
+                                                        )
                                                 @unknown default:
                                                     EmptyView()
                                                 }

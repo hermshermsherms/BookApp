@@ -39,6 +39,7 @@ final class DiscoveryViewModel: ObservableObject {
     func loadFeed() async {
         isLoading = true
         error = nil
+        books = [] // Clear existing books
 
         do {
             // In development mode, skip Supabase and use local tracking
@@ -52,12 +53,18 @@ final class DiscoveryViewModel: ObservableObject {
             }
             
             try await fetchMoreBooks()
+            
+            // If no books were loaded from API, use mock books
+            if books.isEmpty {
+                books = mockBooks()
+            }
+            
             currentIndex = 0
         } catch {
-            // If Google Books fails, use mock data and set error message
-            self.error = "Unable to fetch new books. Showing sample content."
+            // If Google Books fails, always use mock data to ensure users see content
             books = mockBooks()
             currentIndex = 0
+            // Don't set error for initial load - just use mock books silently
         }
 
         isLoading = false
@@ -66,11 +73,21 @@ final class DiscoveryViewModel: ObservableObject {
     // MARK: - Fetch More Books
 
     private func fetchMoreBooks() async throws {
-        let newBooksFromAPI = try await booksService.fetchTrendingBooks(maxResults: 10)
-        let filteredBooks = newBooksFromAPI.filter { !seenBookIds.contains($0.id) }
-        
-        await MainActor.run {
-            books.append(contentsOf: filteredBooks)
+        do {
+            let newBooksFromAPI = try await booksService.fetchTrendingBooks(maxResults: 10)
+            let filteredBooks = newBooksFromAPI.filter { !seenBookIds.contains($0.id) }
+            
+            await MainActor.run {
+                books.append(contentsOf: filteredBooks)
+            }
+        } catch {
+            // If we have no books at all, add mock books to prevent empty state
+            if books.isEmpty {
+                await MainActor.run {
+                    books.append(contentsOf: mockBooks())
+                }
+            }
+            throw error // Re-throw to let caller handle if needed
         }
     }
 
@@ -180,7 +197,7 @@ final class DiscoveryViewModel: ObservableObject {
     private func mockBooks() -> [Book] {
         return [
             Book(
-                id: "mock1",
+                id: "cygWzgEACAAJ",
                 title: "The Seven Husbands of Evelyn Hugo",
                 authors: ["Taylor Jenkins Reid"],
                 description: "From the New York Times bestselling author of Malibu Rising comes the story of legendary film actress Evelyn Hugo, who has lived a life of glamour, ambition, and scandal. When she finally decides to tell her story, she chooses unknown magazine reporter Monique Grant for the job.",
@@ -188,12 +205,12 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.3,
                 pageCount: 400,
                 publishedDate: "2017-06-13",
-                thumbnailURL: "https://books.google.com/books/content?id=example1&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example1&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=cygWzgEACAAJ&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=cygWzgEACAAJ&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             ),
             Book(
-                id: "mock2",
+                id: "NzjhzQEACAAJ",
                 title: "Project Hail Mary",
                 authors: ["Andy Weir"],
                 description: "The sole survivor on a desperate, last-chance mission—and if he fails, humanity and the earth itself will perish. Except that right now, he doesn't know that. He can't even remember his own name, let alone the nature of his assignment or how to complete it.",
@@ -201,12 +218,12 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.6,
                 pageCount: 482,
                 publishedDate: "2021-05-04",
-                thumbnailURL: "https://books.google.com/books/content?id=example2&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example2&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=NzjhzQEACAAJ&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=NzjhzQEACAAJ&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             ),
             Book(
-                id: "mock3",
+                id: "XVvGzwEACAAJ",
                 title: "The Thursday Murder Club",
                 authors: ["Richard Osman"],
                 description: "Four unlikely friends meet each week to investigate cold cases. But when a brutal murder occurs in their own backyard, the Thursday Murder Club find themselves in the middle of their first live case.",
@@ -214,12 +231,12 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.1,
                 pageCount: 368,
                 publishedDate: "2020-09-03",
-                thumbnailURL: "https://books.google.com/books/content?id=example3&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example3&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=XVvGzwEACAAJ&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=XVvGzwEACAAJ&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             ),
             Book(
-                id: "mock4",
+                id: "fFCjDwAAQBAJ",
                 title: "Atomic Habits",
                 authors: ["James Clear"],
                 description: "An easy & proven way to build good habits & break bad ones. Tiny changes, remarkable results. No matter your goals, Atomic Habits offers a proven framework for improving every day.",
@@ -227,12 +244,12 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.7,
                 pageCount: 320,
                 publishedDate: "2018-10-16",
-                thumbnailURL: "https://books.google.com/books/content?id=example4&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example4&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=fFCjDwAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=fFCjDwAAQBAJ&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             ),
             Book(
-                id: "mock5",
+                id: "RLV5DwAAQBAJ",
                 title: "The Silent Patient",
                 authors: ["Alex Michaelides"],
                 description: "A woman's act of violence against her husband—and of the therapist obsessed with uncovering her motive. It will keep you guessing until the final page.",
@@ -240,12 +257,12 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.2,
                 pageCount: 336,
                 publishedDate: "2019-02-05",
-                thumbnailURL: "https://books.google.com/books/content?id=example5&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example5&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=RLV5DwAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=RLV5DwAAQBAJ&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             ),
             Book(
-                id: "mock6",
+                id: "2ObWDgAAQBAJ",
                 title: "Educated",
                 authors: ["Tara Westover"],
                 description: "A memoir about a young girl who, kept out of school, leaves her survivalist family and goes on to earn a PhD from Cambridge University.",
@@ -253,12 +270,12 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.4,
                 pageCount: 334,
                 publishedDate: "2018-02-20",
-                thumbnailURL: "https://books.google.com/books/content?id=example6&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example6&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=2ObWDgAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=2ObWDgAAQBAJ&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             ),
             Book(
-                id: "mock7",
+                id: "W2ZDDwAAQBAJ",
                 title: "The Midnight Library",
                 authors: ["Matt Haig"],
                 description: "Between life and death there is a library, and within that library, the shelves go on forever. Every book provides a chance to try another life you could have lived.",
@@ -266,12 +283,12 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.0,
                 pageCount: 288,
                 publishedDate: "2020-08-13",
-                thumbnailURL: "https://books.google.com/books/content?id=example7&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example7&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=W2ZDDwAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=W2ZDDwAAQBAJ&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             ),
             Book(
-                id: "mock8",
+                id: "B1hSG45JCX4C",
                 title: "Dune",
                 authors: ["Frank Herbert"],
                 description: "Set on the desert planet Arrakis, Dune is the story of the boy Paul Atreides, heir to a noble family tasked with ruling an inhospitable world.",
@@ -279,12 +296,12 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.3,
                 pageCount: 688,
                 publishedDate: "1965-08-01",
-                thumbnailURL: "https://books.google.com/books/content?id=example8&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example8&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=B1hSG45JCX4C&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=B1hSG45JCX4C&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             ),
             Book(
-                id: "mock9",
+                id: "H7GeDAAAQBAJ",
                 title: "Normal People",
                 authors: ["Sally Rooney"],
                 description: "A story of mutual fascination, friendship and love. It takes us from that first conversation to the years beyond, in the company of two people who try to stay apart but find they can't.",
@@ -292,12 +309,12 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 3.9,
                 pageCount: 266,
                 publishedDate: "2018-08-28",
-                thumbnailURL: "https://books.google.com/books/content?id=example9&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example9&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=H7GeDAAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=H7GeDAAAQBAJ&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             ),
             Book(
-                id: "mock10",
+                id: "hi18DwAAQBAJ",
                 title: "Becoming",
                 authors: ["Michelle Obama"],
                 description: "In her memoir, a work of deep reflection and mesmerizing storytelling, Michelle Obama invites readers into her world, chronicling the experiences that have shaped her.",
@@ -305,8 +322,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.5,
                 pageCount: 448,
                 publishedDate: "2018-11-13",
-                thumbnailURL: "https://books.google.com/books/content?id=example10&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=example10&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://books.google.com/books/content?id=hi18DwAAQBAJ&printsec=frontcover&img=1&zoom=1",
+                largeCoverURL: "https://books.google.com/books/content?id=hi18DwAAQBAJ&printsec=frontcover&img=1&zoom=3",
                 infoLink: nil
             )
         ]

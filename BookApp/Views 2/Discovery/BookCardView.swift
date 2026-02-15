@@ -2,12 +2,21 @@ import SwiftUI
 
 struct BookCardView: View {
     let book: Book
-    @State private var imageURL: URL?
+
+    private var highResImageURL: URL? {
+        // Prioritize large cover URL, fallback to thumbnail
+        if let largeCoverURL = book.largeCoverURL {
+            return URL(string: largeCoverURL)
+        } else if let thumbnailURL = book.thumbnailURL {
+            return URL(string: thumbnailURL)
+        }
+        return nil
+    }
 
     var body: some View {
         ZStack(alignment: .bottom) {
-            // Background — book cover
-            AsyncImage(url: imageURL) { phase in
+            // Background — book cover with high-res upfront loading
+            AsyncImage(url: highResImageURL) { phase in
                 switch phase {
                 case .success(let image):
                     image
@@ -28,7 +37,6 @@ struct BookCardView: View {
                     fallbackCover()
                 }
             }
-            .id(book.id + (book.largeCoverURL ?? book.thumbnailURL ?? ""))
 
                 // Gradient overlay at bottom for text readability
                 LinearGradient(
@@ -116,9 +124,6 @@ struct BookCardView: View {
         .clipped() // Ensure no content bleeds outside bounds
         .background(Color.black) // Solid black background
         .ignoresSafeArea()
-        .onAppear {
-            imageURL = URL(string: book.largeCoverURL ?? book.thumbnailURL ?? "")
-        }
     }
 
     @ViewBuilder
