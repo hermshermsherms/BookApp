@@ -5,6 +5,11 @@ struct DiscoveryFeedView: View {
     @State private var currentPage: Int = 0
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging = false
+    
+    // Constants for better maintainability
+    private static let swipeThreshold: CGFloat = 50
+    private static let screenWidth = UIScreen.main.bounds.width
+    private static let screenHeight = UIScreen.main.bounds.height
 
     var body: some View {
         ZStack {
@@ -28,7 +33,7 @@ struct DiscoveryFeedView: View {
                         LazyVStack(spacing: 0) {
                             ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
                                 BookCardView(book: book)
-                                    .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
+                                    .frame(width: Self.screenWidth, height: Self.screenHeight)
                                     .background(Color.black)
                                     .clipped()
                                     .id(index)
@@ -54,15 +59,14 @@ struct DiscoveryFeedView: View {
                             .onEnded { value in
                                 isDragging = false
                                 
-                                let threshold: CGFloat = 50 // Minimum distance to trigger page change
                                 let verticalMovement = value.translation.height
                                 
                                 var targetPage = currentPage
                                 
-                                if verticalMovement < -threshold && currentPage < viewModel.books.count - 1 {
+                                if verticalMovement < -Self.swipeThreshold && currentPage < viewModel.books.count - 1 {
                                     // Swipe up - go to next book
                                     targetPage = currentPage + 1
-                                } else if verticalMovement > threshold && currentPage > 0 {
+                                } else if verticalMovement > Self.swipeThreshold && currentPage > 0 {
                                     // Swipe down - go to previous book
                                     targetPage = currentPage - 1
                                 }
@@ -80,7 +84,7 @@ struct DiscoveryFeedView: View {
                     )
                     .onAppear {
                         currentPage = viewModel.currentIndex
-                        DispatchQueue.main.async {
+                        Task { @MainActor in
                             proxy.scrollTo(currentPage, anchor: .top)
                         }
                     }
@@ -95,8 +99,9 @@ struct DiscoveryFeedView: View {
                 }
                 
                 // Pre-load next book image (hidden)
-                if let nextBook = viewModel.nextBook {
-                    AsyncImage(url: URL(string: nextBook.largeCoverURL ?? nextBook.thumbnailURL ?? "")) { _ in
+                if let nextBook = viewModel.nextBook,
+                   let imageURL = nextBook.highQualityImageURL {
+                    AsyncImage(url: imageURL) { _ in
                         EmptyView()
                     }
                     .frame(width: 0, height: 0)
@@ -158,8 +163,11 @@ struct DiscoveryFeedView: View {
                 }, onBuy: {
                     // Close detail view and open purchase sheet
                     viewModel.showDetailView = false
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                        viewModel.showPurchaseSheet = true
+                    Task {
+                        _ = await Task.sleep(seconds: 0.1)
+                        await MainActor.run {
+                            viewModel.showPurchaseSheet = true
+                        }
                     }
                 }, onDislike: {
                     // Close detail view - no action needed

@@ -1,7 +1,7 @@
 # BookApp — Product Requirements Document
 
-> **Status:** v1 MVP — Discovery Feed Complete + Launch Screen & App Icon Complete
-> **Last Updated:** 2026-02-15
+> **Status:** v1 MVP — Discovery Feed Complete, UI/UX Polished
+> **Last Updated:** 2026-02-14
 
 ---
 
@@ -66,10 +66,9 @@ Scrollable overlay/sheet showing:
 ### Purchase Sheet (Buy button)
 Bottom sheet with purchase options:
 - Amazon (with cart icon and orange branding)
+- Apple Books (with book icon and blue branding)
 - Bookshop.org (with building columns icon and positive branding)
 - **Links open in smooth in-app Safari browser** with proper delegate handling for seamless navigation
-
-**Note:** Apple Books removed from purchase options as requested.
 
 ### Feed Logic (v1 — pre-recommendation engine)
 - Popular/trending books from Google Books API
@@ -79,21 +78,7 @@ Bottom sheet with purchase options:
 
 ---
 
-## 4. App Branding & Launch Experience
-
-### Launch Screen
-- **Static book logo with app branding** - displays for 1.5 seconds
-- Clean white background with brown book icon and "BookApp" text
-- Professional, minimalist design matching the bookish aesthetic
-
-### App Icon
-- **Complete iOS app icon set** generated for all required sizes
-- Book design with clean, recognizable appearance
-- Consistent with the app's warm, bookish visual style
-
----
-
-## 5. Logging Page (Library)
+## 4. Logging Page (Library)
 
 ### Layout
 - **Three tabs:** Want to Read | Reading | Read
@@ -120,7 +105,7 @@ Want to Read → Reading → Read
 
 ---
 
-## 6. Accounts & Auth
+## 5. Accounts & Auth
 
 ### Authentication
 - **Apple Sign In** only (privacy-friendly, App Store compliant)
@@ -134,7 +119,7 @@ Want to Read → Reading → Read
 
 ---
 
-## 7. Design
+## 6. Design
 
 ### Visual Style
 - **Light, warm, bookish** — indie bookstore aesthetic
@@ -151,15 +136,15 @@ Want to Read → Reading → Read
 
 ---
 
-## 8. Monetization (v1)
+## 7. Monetization (v1)
 
 - **Free app** with affiliate revenue from book purchases
-- Affiliate links in purchase sheet (Amazon Associates, Bookshop.org)
+- Affiliate links in purchase sheet (Amazon Associates, Apple Books affiliate)
 - No ads, no premium tier for v1
 
 ---
 
-## 9. Data Model (Supabase)
+## 8. Data Model (Supabase)
 
 ### Tables
 - **users** — id, apple_id, display_name, created_at
@@ -173,7 +158,7 @@ Want to Read → Reading → Read
 
 ---
 
-## 10. Out of Scope (v1) — Deferred to v2+
+## 9. Out of Scope (v1) — Deferred to v2+
 
 | Feature | Notes |
 |---------|-------|
@@ -191,7 +176,7 @@ Want to Read → Reading → Read
 
 ---
 
-## 11. Decisions Log
+## 10. Decisions Log
 
 | # | Question | Decision | Date |
 |---|----------|----------|------|
@@ -212,17 +197,13 @@ Want to Read → Reading → Read
 | 15 | Navigation | 3-tab bar: Discovery, Library, Profile | 2026-02-08 |
 | 16 | v1 Scope | Defer: custom shelves, progress tracking, undo, dark mode | 2026-02-08 |
 | 17 | Monetization | Free + affiliate links | 2026-02-08 |
-| 18 | Launch Screen | Static book logo, 1.5 second display | 2026-02-15 |
-| 19 | App Icon | Complete iOS icon set with book design | 2026-02-15 |
-| 20 | Image Quality | High-res → thumbnail → styled fallback hierarchy | 2026-02-15 |
-| 21 | Apple Books | Removed from purchase options | 2026-02-15 |
 
 ---
 
-## 12. Implementation Plan & Milestones
+## 11. Implementation Plan & Milestones
 
-### Current Status: **Milestone 1 Complete + Launch Screen & App Icon Complete**
-*Last Updated: 2026-02-15*
+### Current Status: **Milestone 1 Complete + UI/UX Polish Complete**
+*Last Updated: 2026-02-14*
 
 **Foundation Completed:**
 - [x] PRD finalized and documented
@@ -251,16 +232,9 @@ Want to Read → Reading → Read
 - ✅ **Enhanced swipe animations for smoother, more natural feel like social media apps**
 - ✅ **Fixed in-app browser white screen issue with proper Safari delegate handling**
 
-**Launch Screen & Branding Completed (Feb 2026):**
-- ✅ **Animated launch screen with static book logo and 1.5 second display**
-- ✅ **Complete iOS app icon set generated with book design**
-- ✅ **High-resolution image loading system with priority fallback**
-- ✅ **Updated mock data with real Google Books IDs for working cover images**
-- ✅ **Comprehensive code cleanup and memory management improvements**
-
 ---
 
-## 13. Feature-by-Feature Implementation Milestones
+## 12. Feature-by-Feature Implementation Milestones
 
 ### **Milestone 1: Discovery Feed MVP** ✅ *[COMPLETED]*
 **Goal:** Users can swipe through real books and see book details
@@ -280,22 +254,14 @@ Want to Read → Reading → Read
 3. **Book Detail View**
    - ✅ Full synopsis, author info, ratings, metadata display
    - ✅ Similar books horizontal scroll
-   - ✅ Purchase sheet with affiliate links (Amazon, Bookshop.org)
+   - ✅ Purchase sheet with affiliate links (Amazon, Apple Books, Bookshop.org)
    - ✅ In-app browser integration (SFSafariViewController)
-
-4. **Launch Experience & Branding**
-   - ✅ Static launch screen with book logo and app branding
-   - ✅ Complete iOS app icon set generation
-   - ✅ High-resolution image loading implementation
-   - ✅ Mock data improvement with real Google Books IDs
 
 **Definition of Done:**
 - [x] User can see and swipe through real books (10 mock books + Google Books API)
 - [x] Detail view shows complete book information (synopsis, author, similar books, metadata)
 - [x] All PRD-specified gestures work smoothly (swipe up/next, left/dislike, double tap/like, single tap/details, right/buy)
 - [x] No placeholder data visible to user (graceful fallback to realistic mock data)
-- [x] Professional launch screen and app icon implemented
-- [x] High-quality image loading system in place
 
 ---
 
@@ -369,6 +335,7 @@ Want to Read → Reading → Read
 **Tasks:**
 1. **Affiliate Revenue Setup**
    - Amazon Associates integration
+   - Apple Books affiliate links
    - Purchase flow testing
 
 2. **Production Polish**
@@ -383,7 +350,7 @@ Want to Read → Reading → Read
 
 ---
 
-## 14. Implementation Best Practices
+## 13. Implementation Best Practices
 
 ### **Lessons Learned from Initial Implementation**
 
@@ -416,54 +383,16 @@ Each milestone should meet these criteria before moving to the next:
 
 ---
 
-## 15. Open Items
+## 14. Open Items
 
-### **Recently Completed (Feb 2026):**
-- [x] Launch screen implementation with static book logo
-- [x] Complete iOS app icon set generation
-- [x] High-resolution image loading with smart fallback hierarchy
-- [x] Mock data improvement with real Google Books IDs
-- [x] Code quality improvements and memory management
+**Completed for Milestone 1:**
 - [x] Google Books API integration with fallback to mock data
 - [x] Real book data fetching and display with high-quality images
 - [x] Smooth swipe gestures and navigation (TikTok/Instagram Reels style)
 - [x] Complete UI/UX polish and bug fixes
 
-### **Technical Debt & Refinements (Current Priority):**
-- [ ] Fix half sheet collapsing issue after closing website
-- [ ] Fix websites that do not render properly in in-app browser  
-- [ ] Remove white outline around half sheet when collapsing website
-- [ ] Investigate and resolve any remaining Safari in-app browser edge cases
-
-### **For Later Milestones:**
+**For Later Milestones:**
 - [ ] Finalize app name and branding
-- [ ] Affiliate program signup (Amazon Associates, Bookshop.org)  
+- [ ] Affiliate program signup (Amazon Associates, Apple Books)  
 - [ ] Supabase project setup and schema migration
 - [ ] App Store provisioning and certificates
-
----
-
-## 16. Project Status Summary
-
-### **What's Working Well:**
-- Discovery Feed MVP is fully functional and polished
-- High-quality image loading system provides excellent user experience
-- TikTok-style navigation feels smooth and natural
-- Purchase flow with in-app Safari browser integration
-- Professional launch screen and app icon
-- Comprehensive error handling and fallback to mock data
-- Clean, maintainable codebase with MVVM architecture
-
-### **Current Focus Areas:**
-- Resolving technical debt items (half sheet issues, browser rendering)
-- Preparing for Milestone 2 (Authentication & User State)
-- Maintaining code quality standards established in Milestone 1
-
-### **Next Steps:**
-1. Address the four technical debt items listed above
-2. Begin Supabase setup and Apple Sign In production configuration
-3. Start implementing user data persistence and session management
-4. Continue building out Library and Profile functionality
-
-The app has achieved a solid foundation with Milestone 1 complete and is ready to progress to user authentication and data persistence in Milestone 2.
-

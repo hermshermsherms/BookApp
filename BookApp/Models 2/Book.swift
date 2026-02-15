@@ -39,6 +39,16 @@ struct Book: Identifiable, Codable, Equatable {
         guard let pages = pageCount else { return "—" }
         return "\(pages) pages"
     }
+    
+    /// Returns the highest quality image URL available, falling back gracefully
+    var highQualityImageURL: URL? {
+        if let largeCoverURL = largeCoverURL, !largeCoverURL.isEmpty {
+            return URL(string: largeCoverURL)
+        } else if let thumbnailURL = thumbnailURL, !thumbnailURL.isEmpty {
+            return URL(string: thumbnailURL)
+        }
+        return nil
+    }
 
     // MARK: - Purchase URLs
 

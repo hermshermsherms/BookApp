@@ -77,15 +77,11 @@ final class DiscoveryViewModel: ObservableObject {
             let newBooksFromAPI = try await booksService.fetchTrendingBooks(maxResults: 10)
             let filteredBooks = newBooksFromAPI.filter { !seenBookIds.contains($0.id) }
             
-            await MainActor.run {
-                books.append(contentsOf: filteredBooks)
-            }
+            books.append(contentsOf: filteredBooks)
         } catch {
             // If we have no books at all, add mock books to prevent empty state
             if books.isEmpty {
-                await MainActor.run {
-                    books.append(contentsOf: mockBooks())
-                }
+                books.append(contentsOf: mockBooks())
             }
             throw error // Re-throw to let caller handle if needed
         }
@@ -94,6 +90,7 @@ final class DiscoveryViewModel: ObservableObject {
     // MARK: - Index Management
     
     func updateCurrentIndex(_ newIndex: Int) {
+        guard newIndex >= 0 && newIndex < books.count else { return }
         currentIndex = newIndex
         
         // Pre-fetch more books if running low
@@ -142,8 +139,11 @@ final class DiscoveryViewModel: ObservableObject {
 
         // Trigger heart animation
         likeAnimationTrigger = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-            self.likeAnimationTrigger = false
+        Task {
+            _ = await Task.sleep(seconds: 0.8)
+            await MainActor.run {
+                likeAnimationTrigger = false
+            }
         }
 
         // Save to library but don't advance - just show the like animation

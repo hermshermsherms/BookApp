@@ -110,6 +110,76 @@ func testPurchaseURLWithEmptyTitle() {
     XCTAssertNil(book.bookshopURL)
 }
 
+func testHighQualityImageURL() {
+    // Test with both URLs available - should prefer large
+    var book = Book(
+        id: "test1",
+        title: "Test",
+        authors: ["Author"],
+        description: nil,
+        categories: [],
+        averageRating: nil,
+        pageCount: nil,
+        publishedDate: nil,
+        thumbnailURL: "https://example.com/small.jpg",
+        largeCoverURL: "https://example.com/large.jpg",
+        infoLink: nil
+    )
+    
+    XCTAssertEqual(book.highQualityImageURL?.absoluteString, "https://example.com/large.jpg")
+    
+    // Test with only thumbnail available
+    book = Book(
+        id: "test2",
+        title: "Test",
+        authors: ["Author"],
+        description: nil,
+        categories: [],
+        averageRating: nil,
+        pageCount: nil,
+        publishedDate: nil,
+        thumbnailURL: "https://example.com/thumb.jpg",
+        largeCoverURL: nil,
+        infoLink: nil
+    )
+    
+    XCTAssertEqual(book.highQualityImageURL?.absoluteString, "https://example.com/thumb.jpg")
+    
+    // Test with no URLs available
+    book = Book(
+        id: "test3",
+        title: "Test",
+        authors: ["Author"],
+        description: nil,
+        categories: [],
+        averageRating: nil,
+        pageCount: nil,
+        publishedDate: nil,
+        thumbnailURL: nil,
+        largeCoverURL: nil,
+        infoLink: nil
+    )
+    
+    XCTAssertNil(book.highQualityImageURL)
+    
+    // Test with empty string URLs
+    book = Book(
+        id: "test4",
+        title: "Test",
+        authors: ["Author"],
+        description: nil,
+        categories: [],
+        averageRating: nil,
+        pageCount: nil,
+        publishedDate: nil,
+        thumbnailURL: "",
+        largeCoverURL: "",
+        infoLink: nil
+    )
+    
+    XCTAssertNil(book.highQualityImageURL)
+}
+
 }
 
 // MARK: - Discovery ViewModel Tests
@@ -145,14 +215,16 @@ class DiscoveryViewModelTests: XCTestCase {
             infoLink: nil
         )
         
-        viewModel.currentBook = mockBook
+        // Simulate having books loaded
+        viewModel.books = [mockBook]
+        viewModel.currentIndex = 0
         
         // Test single tap
         viewModel.singleTap()
         XCTAssertTrue(viewModel.showDetailView)
         
-        // Test swipe right (buy)
-        viewModel.swipeRight()
+        // Test buy action
+        viewModel.buyBook()
         XCTAssertTrue(viewModel.showPurchaseSheet)
         
         // Test double tap (like) - should trigger animation

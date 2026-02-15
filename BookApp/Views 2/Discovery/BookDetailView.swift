@@ -11,13 +11,7 @@ struct BookDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     private var highResImageURL: URL? {
-        // Prioritize large cover URL, fallback to thumbnail
-        if let largeCoverURL = book.largeCoverURL {
-            return URL(string: largeCoverURL)
-        } else if let thumbnailURL = book.thumbnailURL {
-            return URL(string: thumbnailURL)
-        }
-        return nil
+        book.highQualityImageURL
     }
 
     var body: some View {
@@ -154,7 +148,7 @@ struct BookDetailView: View {
                                 HStack(spacing: 14) {
                                     ForEach(similarBooks) { similarBook in
                                         VStack(spacing: 6) {
-                                            AsyncImage(url: URL(string: similarBook.largeCoverURL ?? similarBook.thumbnailURL ?? "")) { phase in
+                                            AsyncImage(url: similarBook.highQualityImageURL) { phase in
                                                 switch phase {
                                                 case .success(let image):
                                                     image

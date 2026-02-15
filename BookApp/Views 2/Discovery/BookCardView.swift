@@ -2,15 +2,13 @@ import SwiftUI
 
 struct BookCardView: View {
     let book: Book
+    
+    // Cache screen dimensions to avoid repeated calculations
+    private static let screenWidth = UIScreen.main.bounds.width
+    private static let screenHeight = UIScreen.main.bounds.height
 
     private var highResImageURL: URL? {
-        // Prioritize large cover URL, fallback to thumbnail
-        if let largeCoverURL = book.largeCoverURL {
-            return URL(string: largeCoverURL)
-        } else if let thumbnailURL = book.thumbnailURL {
-            return URL(string: thumbnailURL)
-        }
-        return nil
+        book.highQualityImageURL
     }
 
     var body: some View {
@@ -22,17 +20,19 @@ struct BookCardView: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fill)
-                        .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
+                        .frame(width: Self.screenWidth, height: Self.screenHeight)
                         .clipped()
-                case .failure:
+                        .accessibilityLabel("Book cover for \(book.title)")
+                case .failure(_):
                     fallbackCover()
                 case .empty:
                     ZStack {
                         Color.black
-                        ProgressView()
+                        ProgressView("Loading...")
                             .tint(Theme.accent)
+                            .foregroundColor(.white.opacity(0.7))
                     }
-                    .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
+                    .frame(width: Self.screenWidth, height: Self.screenHeight)
                 @unknown default:
                     fallbackCover()
                 }
@@ -120,7 +120,7 @@ struct BookCardView: View {
             .padding(.horizontal, max(Theme.paddingLarge, 20)) // Ensure minimum padding
             .padding(.bottom, 120) // Static padding for tab bar + safe area
         }
-        .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
+        .frame(width: Self.screenWidth, height: Self.screenHeight)
         .clipped() // Ensure no content bleeds outside bounds
         .background(Color.black) // Solid black background
         .ignoresSafeArea()
@@ -134,13 +134,15 @@ struct BookCardView: View {
                 Image(systemName: "book.closed.fill")
                     .font(.system(size: 48))
                     .foregroundColor(.white.opacity(0.6))
+                    .accessibilityHidden(true) // Decorative only
                 Text(book.title)
                     .font(Theme.serifBold(20))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal)
+                    .accessibilityLabel("Book cover image not available for \(book.title)")
             }
         }
-        .frame(width: UIScreen.main.bounds.width, height: UIScreen.main.bounds.height)
+        .frame(width: Self.screenWidth, height: Self.screenHeight)
     }
 }
