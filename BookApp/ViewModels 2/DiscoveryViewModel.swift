@@ -140,6 +140,11 @@ final class DiscoveryViewModel: ObservableObject {
         guard currentBook != nil else { return }
         showDetailView = true
     }
+    
+    func buyBook() {
+        guard currentBook != nil else { return }
+        showPurchaseSheet = true
+    }
 
     // MARK: - Helpers
 

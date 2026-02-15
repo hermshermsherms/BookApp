@@ -38,6 +38,9 @@ struct DiscoveryFeedView: View {
                                     .onTapGesture(count: 1) {
                                         viewModel.singleTap()
                                     }
+                                    .onLongPressGesture(minimumDuration: 0.5) {
+                                        viewModel.buyBook()
+                                    }
                             }
                         }
                     }
@@ -153,13 +156,24 @@ struct DiscoveryFeedView: View {
                     viewModel.doubleTap()
                     viewModel.showDetailView = false
                 }, onBuy: {
-                    // Open purchase sheet from detail view
+                    // Close detail view and open purchase sheet
                     viewModel.showDetailView = false
-                    // Could add purchase functionality here if needed
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        viewModel.showPurchaseSheet = true
+                    }
                 }, onDislike: {
                     // Close detail view - no action needed
                     viewModel.showDetailView = false
                 })
+            }
+        }
+        .sheet(isPresented: $viewModel.showPurchaseSheet) {
+            if let book = viewModel.currentBook {
+                PurchaseSheetView(book: book) {
+                    viewModel.showPurchaseSheet = false
+                }
+                .presentationDetents([.height(400), .medium])
+                .presentationDragIndicator(.visible)
             }
         }
         .task {

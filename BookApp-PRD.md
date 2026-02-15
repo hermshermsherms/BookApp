@@ -1,7 +1,7 @@
 # BookApp — Product Requirements Document
 
-> **Status:** v1 MVP — requirements mostly finalized
-> **Last Updated:** 2026-02-08
+> **Status:** v1 MVP — Discovery Feed Complete, UI/UX Polished
+> **Last Updated:** 2026-02-14
 
 ---
 
@@ -35,35 +35,40 @@ User accounts (via Apple Sign In) power personalization across both.
 ### Interaction Model
 | Gesture | Action | Result |
 |---------|--------|--------|
-| Swipe up | Next book | Advances feed |
-| Swipe left | Dislike | Soft signal — won't reappear soon, used as negative signal for future recs |
-| Double tap | Like | Saves to Library → "Want to Read" |
-| Single tap | Details | Opens scrollable detail view |
-| Swipe right | Buy | Auto-saves to Library + shows purchase sheet |
+| Swipe up | Next book | Smooth transition to next book (TikTok-style) |
+| Swipe down | Previous book | Smooth transition to previous book (Instagram Reels-style) |
+| Double tap | Like | Saves to Library → "Want to Read" + heart animation |
+| Single tap | Details | Opens scrollable detail view with optimized action buttons |
+| Buy button | Purchase | Shows purchase sheet with in-app browser links |
+
+**Note:** Swipe left/right gestures were removed in favor of cleaner vertical-only navigation for optimal feed experience.
 
 ### Card Content (full-screen)
-- Book cover image (prominent, centered)
-- Title + Author
-- Genre tag(s)
-- Average rating (from Google Books)
-- Page count
+- **High-quality book cover image** with smart fallback hierarchy:
+  1. High-resolution cover from Google Books API
+  2. Thumbnail fallback if high-res unavailable
+  3. Genre-specific styled title card with gradients and icons
+- Title (serif typography) + Author
+- Genre tag with accent styling
+- Average rating (star icon) + page count
 - One-line hook / description snippet
+- Smooth animations and transitions throughout
 
 ### Detail View (single tap)
 Scrollable overlay/sheet showing:
-- Book cover (large)
+- Book cover (large, high-quality)
 - Title, author, genre, page count, publication date
 - Full synopsis / description
 - Author info snippet
-- Similar books (horizontal scroll)
-- Action buttons: Like, Buy, Dislike
+- **Skip, Save, Buy buttons** (positioned above similar books for better UX)
+- Similar books (horizontal scroll with improved image quality)
 
-### Purchase Sheet (swipe right)
+### Purchase Sheet (Buy button)
 Bottom sheet with purchase options:
-- Amazon
-- Apple Books
-- Bookshop.org
-- Links open in in-app browser (SFSafariViewController)
+- Amazon (with cart icon and orange branding)
+- Apple Books (with book icon and blue branding)
+- Bookshop.org (with building columns icon and positive branding)
+- **Links open in smooth in-app Safari browser** with proper delegate handling for seamless navigation
 
 ### Feed Logic (v1 — pre-recommendation engine)
 - Popular/trending books from Google Books API
@@ -197,8 +202,8 @@ Want to Read → Reading → Read
 
 ## 11. Implementation Plan & Milestones
 
-### Current Status: **Milestone 1 Complete - Discovery Feed Fully Functional**
-*Last Updated: 2026-02-10*
+### Current Status: **Milestone 1 Complete + UI/UX Polish Complete**
+*Last Updated: 2026-02-14*
 
 **Foundation Completed:**
 - [x] PRD finalized and documented
@@ -210,11 +215,22 @@ Want to Read → Reading → Read
 
 **Milestone 1 Achievements:**
 - ✅ **Discovery Feed is fully functional with real book data**
-- ✅ **All swipe gestures working perfectly (up/next, left/dislike, double tap/like, single tap/details, right/buy)**
-- ✅ **Complete book detail views with synopsis, author info, similar books**
-- ✅ **Purchase flow with affiliate links and in-app browser**
+- ✅ **Smooth vertical swipe navigation (TikTok/Instagram Reels style)**
+- ✅ **Complete book detail views with optimized button placement**
+- ✅ **High-quality image system with smart fallback hierarchy**
+- ✅ **Purchase flow with in-app Safari browser integration**
 - ✅ **Professional error handling and graceful fallback to mock data**
 - ✅ **Production-ready code quality with comprehensive testing**
+
+**UI/UX Polish Completed (Feb 2026):**
+- ✅ **Repositioned Skip/Save/Buy buttons above "You might also like" for better UX**
+- ✅ **Fixed buy button functionality to properly show purchase sheet**
+- ✅ **Dramatically improved image quality with high-res → thumbnail → styled fallback hierarchy**
+- ✅ **Eliminated image reloading issues during swipes**
+- ✅ **Replaced plain white fallbacks with beautiful genre-specific styled title cards**
+- ✅ **Removed unwanted zoom effects during scrolling**
+- ✅ **Enhanced swipe animations for smoother, more natural feel like social media apps**
+- ✅ **Fixed in-app browser white screen issue with proper Safari delegate handling**
 
 ---
 
@@ -369,10 +385,11 @@ Each milestone should meet these criteria before moving to the next:
 
 ## 14. Open Items
 
-**For Milestone 1 (Discovery Feed MVP):**
-- [ ] Google Books API key setup and rate limit planning
-- [ ] Implement real book data fetching and display
-- [ ] Add swipe gestures and navigation
+**Completed for Milestone 1:**
+- [x] Google Books API integration with fallback to mock data
+- [x] Real book data fetching and display with high-quality images
+- [x] Smooth swipe gestures and navigation (TikTok/Instagram Reels style)
+- [x] Complete UI/UX polish and bug fixes
 
 **For Later Milestones:**
 - [ ] Finalize app name and branding
