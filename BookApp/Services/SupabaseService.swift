@@ -5,8 +5,8 @@ final class SupabaseService {
     static let shared = SupabaseService()
 
     // TODO: Move to environment config before release
-    private let supabaseURL = "https://YOUR_PROJECT.supabase.co"
-    private let supabaseAnonKey = "YOUR_ANON_KEY"
+    private let supabaseURL = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String ?? "https://YOUR_PROJECT.supabase.co"
+    private let supabaseAnonKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String ?? "YOUR_ANON_KEY"
 
     private let session: URLSession
     private let decoder: JSONDecoder

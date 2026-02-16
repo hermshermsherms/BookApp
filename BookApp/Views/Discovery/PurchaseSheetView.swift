@@ -15,7 +15,7 @@ struct PurchaseSheetView: View {
             VStack(spacing: Theme.paddingLarge) {
                 // Book info header
                 HStack(spacing: Theme.paddingMedium) {
-                    AsyncImage(url: URL(string: book.thumbnailURL ?? "")) { phase in
+                    AsyncImage(url: URL(string: book.largeCoverURL ?? book.thumbnailURL ?? "")) { phase in
                         switch phase {
                         case .success(let image):
                             image
@@ -104,10 +104,10 @@ struct PurchaseSheetView: View {
             #endif
         }
         #if os(iOS)
-        .fullScreenCover(isPresented: $showSafari) {
+        .interactiveDismissDisabled(showSafari)
+        .sheet(isPresented: $showSafari) {
             if let url = selectedURL {
-                SafariView(url: url)
-                    .ignoresSafeArea()
+                SafariView(url: url, isPresented: $showSafari)
             }
         }
         #endif
@@ -152,13 +152,38 @@ struct PurchaseSheetView: View {
 #if os(iOS)
 struct SafariView: UIViewControllerRepresentable {
     let url: URL
+    @Binding var isPresented: Bool
 
     func makeUIViewController(context: Context) -> SFSafariViewController {
         let config = SFSafariViewController.Configuration()
         config.entersReaderIfAvailable = false
-        return SFSafariViewController(url: url, configuration: config)
+        config.barCollapsingEnabled = true
+        let safariVC = SFSafariViewController(url: url, configuration: config)
+        safariVC.delegate = context.coordinator
+        safariVC.preferredBarTintColor = UIColor.systemBackground
+        safariVC.preferredControlTintColor = UIColor.systemBlue
+        return safariVC
     }
 
     func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(self)
+    }
+    
+    class Coordinator: NSObject, SFSafariViewControllerDelegate {
+        let parent: SafariView
+        
+        init(_ parent: SafariView) {
+            self.parent = parent
+        }
+        
+        func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
+            // Only dismiss the Safari sheet by setting the binding to false
+            DispatchQueue.main.async {
+                self.parent.isPresented = false
+            }
+        }
+    }
 }
 #endif

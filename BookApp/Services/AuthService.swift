@@ -21,8 +21,8 @@ final class AuthService: ObservableObject {
 
     private init() {
         // TODO: Move to environment config before release
-        self.supabaseURL = "https://YOUR_PROJECT.supabase.co"
-        self.supabaseAnonKey = "YOUR_ANON_KEY"
+        self.supabaseURL = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_URL") as? String ?? "https://YOUR_PROJECT.supabase.co"
+        self.supabaseAnonKey = Bundle.main.object(forInfoDictionaryKey: "SUPABASE_ANON_KEY") as? String ?? "YOUR_ANON_KEY"
         self.session = URLSession.shared
         self.decoder = JSONDecoder()
 

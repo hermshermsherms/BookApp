@@ -39,21 +39,39 @@ struct Book: Identifiable, Codable, Equatable {
         guard let pages = pageCount else { return "—" }
         return "\(pages) pages"
     }
+    
+    /// Returns the highest quality image URL available, falling back gracefully
+    var highQualityImageURL: URL? {
+        if let largeCoverURL = largeCoverURL, !largeCoverURL.isEmpty {
+            return URL(string: largeCoverURL)
+        } else if let thumbnailURL = thumbnailURL, !thumbnailURL.isEmpty {
+            return URL(string: thumbnailURL)
+        }
+        return nil
+    }
 
     // MARK: - Purchase URLs
 
     var amazonURL: URL? {
-        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
-        return URL(string: "https://www.amazon.com/s?k=\(query)&i=stripbooks")
+        let searchTerm = "\(title) \(authorDisplay)"
+        guard let query = searchTerm.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              !query.isEmpty else { return nil }
+        // Use mobile-friendly Amazon URL that works better in in-app browsers
+        return URL(string: "https://www.amazon.com/s?k=\(query)&i=stripbooks&ref=nb_sb_noss")
     }
 
     var appleBooksURL: URL? {
-        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
-        return URL(string: "https://books.apple.com/us/book?term=\(query)")
+        let searchTerm = "\(title) \(authorDisplay)"
+        guard let query = searchTerm.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              !query.isEmpty else { return nil }
+        // Use web URL for Safari in-app browser (works better than app URL scheme)
+        return URL(string: "https://books.apple.com/us/search?term=\(query)")
     }
 
     var bookshopURL: URL? {
-        let query = title.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? title
+        let searchTerm = "\(title) \(authorDisplay)"
+        guard let query = searchTerm.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed),
+              !query.isEmpty else { return nil }
         return URL(string: "https://bookshop.org/search?keywords=\(query)")
     }
 }
