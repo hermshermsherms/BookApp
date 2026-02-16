@@ -54,14 +54,18 @@ final class AuthViewModel: ObservableObject {
     
     #if DEBUG
     func signInAsDemoUser() {
+        print("🔐 Demo User: Starting sign in...")
         isLoading = true
         error = nil
         
         Task {
+            print("🔐 Demo User: Calling authService.signInAsDemoUser()")
             authService.signInAsDemoUser()
             await MainActor.run {
+                print("🔐 Demo User: Setting isAuthenticated = true")
                 self.isAuthenticated = true
                 self.isLoading = false
+                print("🔐 Demo User: Sign in complete. isAuthenticated = \(self.isAuthenticated)")
             }
         }
     }

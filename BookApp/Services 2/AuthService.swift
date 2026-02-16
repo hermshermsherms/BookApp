@@ -185,16 +185,19 @@ final class AuthService: ObservableObject {
     #if DEBUG
     /// Sign in as a demo user for development testing
     func signInAsDemoUser() {
+        print("🔐 AuthService: Demo user sign in called")
         let demoUserId = UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID()
         let demoDisplayName = "Demo User"
         let demoAccessToken = "demo_access_token"
         
+        print("🔐 AuthService: Creating demo session with ID: \(demoUserId)")
         saveSession(
             userId: demoUserId,
             displayName: demoDisplayName,
             accessToken: demoAccessToken,
             refreshToken: nil
         )
+        print("🔐 AuthService: Demo session saved. isAuthenticated = \(isAuthenticated)")
     }
     #endif
 }
