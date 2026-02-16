@@ -57,9 +57,7 @@ struct DiscoveryFeedView: View {
                             dragOffset = value.translation.height
                         }
                         .onEnded { value in
-                            isDragging = false
                             let verticalMovement = value.translation.height
-                            
                             var targetPage = currentPage
                             
                             if verticalMovement < -Self.swipeThreshold && currentPage < viewModel.books.count - 1 {
@@ -70,13 +68,23 @@ struct DiscoveryFeedView: View {
                                 targetPage = currentPage - 1
                             }
                             
-                            // Animate to target position
-                            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                dragOffset = 0
-                                if targetPage != currentPage {
+                            if targetPage != currentPage {
+                                // Page change - animate to new position
+                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                                     currentPage = targetPage
-                                    viewModel.updateCurrentIndex(targetPage)
+                                    dragOffset = 0
                                 }
+                                viewModel.updateCurrentIndex(targetPage)
+                            } else {
+                                // No page change - snap back to original position
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                                    dragOffset = 0
+                                }
+                            }
+                            
+                            // Reset dragging state after animation starts
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                                isDragging = false
                             }
                         }
                 )
