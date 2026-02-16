@@ -383,6 +383,29 @@ Want to Read → Reading → Read
 
 ---
 
+### **Milestone 6: Technical Debt & Browser Refinements**
+**Goal:** Polish in-app browser experience and resolve edge cases
+
+**Tasks:**
+1. **Safari Browser Integration Fixes**
+   - Fix half sheet collapsing issue after closing website
+   - Fix websites that do not render properly in in-app browser  
+   - Remove white outline around half sheet when collapsing website
+   - Investigate and resolve any remaining Safari in-app browser edge cases
+
+2. **Performance & Polish**
+   - Code optimization and cleanup
+   - Memory management improvements
+   - Animation smoothness enhancements
+
+**Definition of Done:**
+- [ ] All Safari browser edge cases resolved
+- [ ] Half sheet behavior is smooth and consistent
+- [ ] No visual glitches in purchase flow
+- [ ] App feels polished and professional throughout
+
+---
+
 ## 14. Implementation Best Practices
 
 ### **Lessons Learned from Initial Implementation**
@@ -429,16 +452,15 @@ Each milestone should meet these criteria before moving to the next:
 - [x] Smooth swipe gestures and navigation (TikTok/Instagram Reels style)
 - [x] Complete UI/UX polish and bug fixes
 
-### **Technical Debt & Refinements (Current Priority):**
-- [ ] Fix half sheet collapsing issue after closing website
-- [ ] Fix websites that do not render properly in in-app browser  
-- [ ] Remove white outline around half sheet when collapsing website
-- [ ] Investigate and resolve any remaining Safari in-app browser edge cases
+### **Next Priority: Authentication & User State Setup**
+- [ ] Supabase project setup and schema migration
+- [ ] Configure Apple Developer account capabilities
+- [ ] Replace demo user with real Apple Sign In
+- [ ] Handle authentication states and errors
 
 ### **For Later Milestones:**
 - [ ] Finalize app name and branding
 - [ ] Affiliate program signup (Amazon Associates, Bookshop.org)  
-- [ ] Supabase project setup and schema migration
 - [ ] App Store provisioning and certificates
 
 ---
@@ -455,15 +477,15 @@ Each milestone should meet these criteria before moving to the next:
 - Clean, maintainable codebase with MVVM architecture
 
 ### **Current Focus Areas:**
-- Resolving technical debt items (half sheet issues, browser rendering)
 - Preparing for Milestone 2 (Authentication & User State)
+- Supabase project setup and Apple Sign In configuration
 - Maintaining code quality standards established in Milestone 1
 
 ### **Next Steps:**
-1. Address the four technical debt items listed above
-2. Begin Supabase setup and Apple Sign In production configuration
-3. Start implementing user data persistence and session management
-4. Continue building out Library and Profile functionality
+1. Begin Supabase setup and Apple Sign In production configuration
+2. Start implementing user data persistence and session management
+3. Continue building out Library and Profile functionality
+4. Address technical debt items in final milestone before App Store launch
 
 The app has achieved a solid foundation with Milestone 1 complete and is ready to progress to user authentication and data persistence in Milestone 2.
 
