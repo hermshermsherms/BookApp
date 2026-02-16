@@ -54,11 +54,11 @@ struct DiscoveryFeedView: View {
                         .onChanged { value in
                             isDragging = true
                             // Update drag offset to follow finger
-                            dragOffset = value.translation.y
+                            dragOffset = value.translation.height
                         }
                         .onEnded { value in
                             isDragging = false
-                            let verticalMovement = value.translation.y
+                            let verticalMovement = value.translation.height
                             
                             var targetPage = currentPage
                             
