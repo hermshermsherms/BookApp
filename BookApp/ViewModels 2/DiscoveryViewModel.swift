@@ -140,7 +140,7 @@ final class DiscoveryViewModel: ObservableObject {
         // Trigger heart animation
         likeAnimationTrigger = true
         Task {
-            _ = await Task.sleep(seconds: 0.8)
+            try? await Task.sleep(nanoseconds: UInt64(0.8 * 1_000_000_000))
             await MainActor.run {
                 likeAnimationTrigger = false
             }

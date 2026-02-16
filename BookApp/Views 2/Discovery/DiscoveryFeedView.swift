@@ -164,7 +164,7 @@ struct DiscoveryFeedView: View {
                     // Close detail view and open purchase sheet
                     viewModel.showDetailView = false
                     Task {
-                        _ = await Task.sleep(seconds: 0.1)
+                        try? await Task.sleep(nanoseconds: UInt64(0.1 * 1_000_000_000))
                         await MainActor.run {
                             viewModel.showPurchaseSheet = true
                         }
