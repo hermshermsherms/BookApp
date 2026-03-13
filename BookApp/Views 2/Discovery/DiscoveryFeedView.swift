@@ -164,7 +164,7 @@ struct DiscoveryFeedView: View {
                         }
                     }
                 }, onDislike: {
-                    // Close detail view - no action needed
+                    // Close detail view - no action n eeded
                     viewModel.showDetailView = false
                 })
             }
