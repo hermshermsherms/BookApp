@@ -37,6 +37,7 @@ struct User: Codable, Identifiable {
     var needsOnboarding: Bool {
         return !onboardingCompleted
     }
+<<<<<<< HEAD
 }
 
 /// User profile update request
@@ -53,4 +54,6 @@ struct UserProfileUpdate: Codable {
         self.displayName = displayName
         self.onboardingCompleted = onboardingCompleted
     }
+=======
+>>>>>>> user-auth
 }
