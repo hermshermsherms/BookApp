@@ -22,19 +22,25 @@ final class GoogleBooksService {
 
     // MARK: - Fetch Trending/Popular Books
 
+    /// Broad browse subjects used for the feed (cold-start rotation and the
+    /// recommendation engine's exploration/exploitation picks share this list).
+    static let allSubjects: [String] = [
+        "fiction", "mystery", "science fiction", "romance",
+        "biography", "history", "self help", "fantasy",
+        "thriller", "literary fiction", "philosophy", "psychology"
+    ]
+
     /// Fetches popular books across genres for the Discovery feed.
-    /// Rotates through subjects to keep the feed varied.
+    /// Rotates through subjects to keep the feed varied (used for cold start).
     func fetchTrendingBooks(startIndex: Int = 0, maxResults: Int = 10) async throws -> [Book] {
-        let subjects = [
-            "fiction", "mystery", "science fiction", "romance",
-            "biography", "history", "self help", "fantasy",
-            "thriller", "literary fiction", "philosophy", "psychology"
-        ]
+        let randomSubject = Self.allSubjects.randomElement() ?? "fiction"
+        return try await fetchBooks(subject: randomSubject, startIndex: startIndex, maxResults: maxResults)
+    }
 
-        let randomSubject = subjects.randomElement() ?? "fiction"
-        let query = "subject:\(randomSubject)"
-
-        return try await searchBooks(query: query, startIndex: startIndex, maxResults: maxResults, orderBy: "relevance")
+    /// Fetches books for a specific subject/genre. Thin wrapper over `searchBooks`
+    /// (reuses the transient-error retry) — used by the recommendation feed.
+    func fetchBooks(subject: String, startIndex: Int = 0, maxResults: Int = 10) async throws -> [Book] {
+        try await searchBooks(query: "subject:\(subject)", startIndex: startIndex, maxResults: maxResults, orderBy: "relevance")
     }
 
     // MARK: - Search Books
@@ -74,6 +80,9 @@ final class GoogleBooksService {
         let booksResponse = try decoder.decode(GoogleBooksResponse.self, from: data)
 
         let books = booksResponse.items?.compactMap { item -> Book? in
+            // English only — `langRestrict` is a soft hint, so enforce the volume's
+            // actual language to keep translated/foreign editions out of the feed.
+            guard item.volumeInfo.language == "en" else { return nil }
             let book = item.toBook()
             // Filter out books without covers or descriptions
             guard book.thumbnailURL != nil, book.description != nil else { return nil }

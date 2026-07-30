@@ -4,8 +4,10 @@ struct DiscoveryFeedView: View {
     @StateObject private var viewModel = DiscoveryViewModel()
     @State private var currentPage: Int = 0
     @State private var dragOffset: CGFloat = 0
+    @State private var horizontalDrag: CGFloat = 0
+    @State private var swipeAxis: Axis? = nil
     @State private var isDragging = false
-    
+
     // Constants for better maintainability
     private static let swipeThreshold: CGFloat = 80
     private static let screenWidth = UIScreen.main.bounds.width
@@ -36,12 +38,11 @@ struct DiscoveryFeedView: View {
                             .background(Theme.background)
                             .clipped()
                             .offset(y: calculateOffset(for: index))
+                            .offset(x: calculateXOffset(for: index))
+                            .rotationEffect(.degrees(calculateRotation(for: index)))
                             .opacity(calculateOpacity(for: index))
                             .scaleEffect(calculateScale(for: index))
-                            .onTapGesture(count: 2) {
-                                viewModel.doubleTap()
-                            }
-                            .onTapGesture(count: 1) {
+                            .onTapGesture {
                                 viewModel.singleTap()
                             }
                             .onLongPressGesture(minimumDuration: 0.5) {
@@ -52,40 +53,30 @@ struct DiscoveryFeedView: View {
                 .gesture(
                     DragGesture()
                         .onChanged { value in
-                            isDragging = true
-                            // Update drag offset to follow finger
-                            dragOffset = value.translation.height
+                            let w = value.translation.width
+                            let h = value.translation.height
+                            // Lock to one axis once the gesture clearly favors a direction,
+                            // so horizontal like/dislike and vertical paging never conflict.
+                            if swipeAxis == nil, hypot(w, h) > 12 {
+                                swipeAxis = abs(w) > abs(h) ? .horizontal : .vertical
+                            }
+                            switch swipeAxis {
+                            case .horizontal:
+                                horizontalDrag = w
+                            case .vertical:
+                                isDragging = true
+                                dragOffset = h
+                            case .none:
+                                break
+                            }
                         }
                         .onEnded { value in
-                            let verticalMovement = value.translation.height
-                            var targetPage = currentPage
-                            
-                            if verticalMovement < -Self.swipeThreshold && currentPage < viewModel.books.count - 1 {
-                                // Swipe up - go to next book
-                                targetPage = currentPage + 1
-                            } else if verticalMovement > Self.swipeThreshold && currentPage > 0 {
-                                // Swipe down - go to previous book
-                                targetPage = currentPage - 1
-                            }
-                            
-                            if targetPage != currentPage {
-                                // Page change - animate to new position
-                                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                                    currentPage = targetPage
-                                    dragOffset = 0
-                                }
-                                viewModel.updateCurrentIndex(targetPage)
+                            if swipeAxis == .horizontal {
+                                handleHorizontalEnd(width: value.translation.width)
                             } else {
-                                // No page change - snap back to original position
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                                    dragOffset = 0
-                                }
+                                handleVerticalEnd(height: value.translation.height)
                             }
-                            
-                            // Reset dragging state after animation starts
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                                isDragging = false
-                            }
+                            swipeAxis = nil
                         }
                 )
                 .ignoresSafeArea(.all)
@@ -110,11 +101,30 @@ struct DiscoveryFeedView: View {
                     .opacity(0)
                 }
 
+                // Live like/dislike indicator that fades in while swiping horizontally
+                if swipeAxis == .horizontal, horizontalDrag != 0 {
+                    Image(systemName: horizontalDrag > 0 ? "heart.fill" : "xmark")
+                        .font(.system(size: 96, weight: .bold))
+                        .foregroundColor(horizontalDrag > 0 ? Theme.positive : Theme.negative)
+                        .opacity(min(1.0, abs(horizontalDrag) / Self.swipeThreshold))
+                        .zIndex(11)
+                }
+
                 // Like animation overlay
                 if viewModel.likeAnimationTrigger {
                     Image(systemName: "heart.fill")
                         .font(.system(size: 80))
-                        .foregroundColor(.white)
+                        .foregroundColor(Theme.positive)
+                        .shadow(color: .black.opacity(0.3), radius: 8)
+                        .transition(.scale.combined(with: .opacity))
+                        .zIndex(10)
+                }
+
+                // Dislike animation overlay
+                if viewModel.dislikeAnimationTrigger {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 80, weight: .bold))
+                        .foregroundColor(Theme.negative)
                         .shadow(color: .black.opacity(0.3), radius: 8)
                         .transition(.scale.combined(with: .opacity))
                         .zIndex(10)
@@ -160,7 +170,7 @@ struct DiscoveryFeedView: View {
         .sheet(isPresented: $viewModel.showDetailView) {
             if let book = viewModel.currentBook {
                 BookDetailView(book: book, onLike: {
-                    viewModel.doubleTap()
+                    viewModel.likeCurrent()
                     viewModel.showDetailView = false
                 }, onBuy: {
                     // Close detail view and open purchase sheet
@@ -191,8 +201,73 @@ struct DiscoveryFeedView: View {
         }
     }
 
+    // MARK: - Gesture End Handlers
+
+    private func handleVerticalEnd(height verticalMovement: CGFloat) {
+        var targetPage = currentPage
+
+        if verticalMovement < -Self.swipeThreshold && currentPage < viewModel.books.count - 1 {
+            targetPage = currentPage + 1   // swipe up → next
+        } else if verticalMovement > Self.swipeThreshold && currentPage > 0 {
+            targetPage = currentPage - 1   // swipe down → previous
+        }
+
+        if targetPage != currentPage {
+            let movingForward = targetPage > currentPage
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                currentPage = targetPage
+                dragOffset = 0
+            }
+            // Swiping up past a book (without judging) is a mild skip signal.
+            if movingForward {
+                viewModel.skipCurrent()
+            }
+            viewModel.updateCurrentIndex(targetPage)
+        } else {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                dragOffset = 0
+            }
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+            isDragging = false
+        }
+    }
+
+    private func handleHorizontalEnd(width: CGFloat) {
+        guard abs(width) > Self.swipeThreshold else {
+            // Not far enough — snap back to center.
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                horizontalDrag = 0
+            }
+            return
+        }
+        // Register the judgment (shows the heart/X overlay + advances the feed),
+        // and return the card to center as the next book slides up.
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
+            horizontalDrag = 0
+        }
+        if width > 0 {
+            viewModel.swipeLike()
+        } else {
+            viewModel.swipeDislike()
+        }
+    }
+
     // MARK: - Helper Methods for Fluid Swipe Animation
-    
+
+    /// Horizontal follow-the-finger offset, applied only to the current card.
+    private func calculateXOffset(for index: Int) -> CGFloat {
+        guard swipeAxis == .horizontal, index == currentPage else { return 0 }
+        return horizontalDrag
+    }
+
+    /// Subtle Tinder-style tilt while dragging the current card sideways.
+    private func calculateRotation(for index: Int) -> Double {
+        guard swipeAxis == .horizontal, index == currentPage else { return 0 }
+        return Double(horizontalDrag / 20)
+    }
+
     private func calculateOffset(for index: Int) -> CGFloat {
         let currentOffset = CGFloat(index - currentPage) * Self.screenHeight
         

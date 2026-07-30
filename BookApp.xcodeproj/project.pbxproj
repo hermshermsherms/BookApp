@@ -39,6 +39,9 @@
 		3F755BB92F3AD73400FDF4E5 /* HighQualityBookImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B972F3AD73400FDF4E5 /* HighQualityBookImageView.swift */; };
 		3F755BC12F3AD73400FDF4E7 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755BC02F3AD73400FDF4E7 /* Secrets.swift */; };
 		3F755BC32F3AD73400FDF4E7 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755BC22F3AD73400FDF4E7 /* CachedAsyncImage.swift */; };
+		3F755BC52F3AD73400FDF4E7 /* RecommendationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755BC42F3AD73400FDF4E7 /* RecommendationEngine.swift */; };
+		3F755BC72F3AD73400FDF4E7 /* EmbeddingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755BC62F3AD73400FDF4E7 /* EmbeddingService.swift */; };
+		3F755BC92F3AD73400FDF4E7 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755BC82F3AD73400FDF4E7 /* LibraryStore.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +53,9 @@
 		3F755B852F3AD73400FDF4E4 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		3F755B862F3AD73400FDF4E4 /* GoogleBooksService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoogleBooksService.swift; sourceTree = "<group>"; };
 		3F755B872F3AD73400FDF4E4 /* SupabaseService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseService.swift; sourceTree = "<group>"; };
+		3F755BC42F3AD73400FDF4E7 /* RecommendationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationEngine.swift; sourceTree = "<group>"; };
+		3F755BC62F3AD73400FDF4E7 /* EmbeddingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddingService.swift; sourceTree = "<group>"; };
+		3F755BC82F3AD73400FDF4E7 /* LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStore.swift; sourceTree = "<group>"; };
 		3F755B882F3AD73400FDF4E5 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		3F755B892F3AD73400FDF4E4 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		3F755B8A2F3AD73400FDF4E4 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
@@ -106,6 +112,9 @@
 				3F755B852F3AD73400FDF4E4 /* AuthService.swift */,
 				3F755B862F3AD73400FDF4E4 /* GoogleBooksService.swift */,
 				3F755B872F3AD73400FDF4E4 /* SupabaseService.swift */,
+				3F755BC42F3AD73400FDF4E7 /* RecommendationEngine.swift */,
+				3F755BC62F3AD73400FDF4E7 /* EmbeddingService.swift */,
+				3F755BC82F3AD73400FDF4E7 /* LibraryStore.swift */,
 				3F755B882F3AD73400FDF4E5 /* Config.swift */,
 			);
 			path = Services;
@@ -331,6 +340,9 @@
 				3F755BB92F3AD73400FDF4E5 /* HighQualityBookImageView.swift in Sources */,
 				3F755BC12F3AD73400FDF4E7 /* Secrets.swift in Sources */,
 				3F755BC32F3AD73400FDF4E7 /* CachedAsyncImage.swift in Sources */,
+				3F755BC52F3AD73400FDF4E7 /* RecommendationEngine.swift in Sources */,
+				3F755BC72F3AD73400FDF4E7 /* EmbeddingService.swift in Sources */,
+				3F755BC92F3AD73400FDF4E7 /* LibraryStore.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

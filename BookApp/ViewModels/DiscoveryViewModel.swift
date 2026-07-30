@@ -10,7 +10,8 @@ final class DiscoveryViewModel: ObservableObject {
     @Published var showPurchaseSheet = false
     @Published var showDetailView = false
     @Published var likeAnimationTrigger = false
-    
+    @Published var dislikeAnimationTrigger = false
+
     var currentBook: Book? {
         guard currentIndex < books.count else { return nil }
         return books[currentIndex]
@@ -31,8 +32,9 @@ final class DiscoveryViewModel: ObservableObject {
     private var seenBookIds: Set<String> = []
     private let booksService = GoogleBooksService.shared
     private let supabaseService = SupabaseService.shared
+    private let engine = RecommendationEngine.shared
     private let prefetchThreshold = 3
-    private var prefetchTask: Task<Void, Never>?
+    private var isFetchingMore = false
 
     // MARK: - Load Feed
 
@@ -41,17 +43,18 @@ final class DiscoveryViewModel: ObservableObject {
         error = nil
         books = [] // Clear existing books
 
+        // Seed from the durable on-device signal store so previously seen/disliked
+        // books stay excluded across launches.
+        engine.load()
+        seenBookIds = engine.seenBookIds
+
         do {
-            // In development mode, skip Supabase and use local tracking
-            if let userId = AuthService.shared.currentUserId {
-                do {
-                    seenBookIds = try await supabaseService.fetchSwipedBookIds(userId: userId)
-                } catch {
-                    // Fallback to empty set if Supabase fails (development mode)
-                    seenBookIds = []
-                }
+            // When Supabase auth lands, union in the server's swiped ids too.
+            if let userId = AuthService.shared.currentUserId,
+               let serverSeen = try? await supabaseService.fetchSwipedBookIds(userId: userId) {
+                seenBookIds.formUnion(serverSeen)
             }
-            
+
             try await fetchMoreBooks()
 
             // If no books were loaded from API, use mock books
@@ -73,25 +76,101 @@ final class DiscoveryViewModel: ObservableObject {
     // MARK: - Fetch More Books
 
     private func fetchMoreBooks() async throws {
-        do {
-            let newBooksFromAPI = try await booksService.fetchTrendingBooks(maxResults: 10)
-            // Exclude books the user has already seen AND anything already in the feed.
-            // Without the in-feed check, a popular title returned by two different genre
-            // batches would appear twice, giving the ForEach duplicate IDs and blanking
-            // the screen.
-            let existingIds = Set(books.map { $0.id })
-            let filteredBooks = newBooksFromAPI.filter {
-                !seenBookIds.contains($0.id) && !existingIds.contains($0.id)
-            }
+        // Only one fetch at a time. Rapid like/dislike swiping used to fire several
+        // concurrent fetches that each snapshotted `books` before appending, producing
+        // duplicate IDs in the ForEach and blanking the screen.
+        guard !isFetchingMore else { return }
+        isFetchingMore = true
+        defer { isFetchingMore = false }
 
-            books.append(contentsOf: filteredBooks)
-        } catch {
-            // If we have no books at all, add mock books to prevent empty state
+        var addedCount = 0
+        var attempts = 0
+        var lastError: Error?
+
+        // Retry with fresh genres until we actually add some books. Strict English
+        // filtering plus seen/disliked exclusions can leave a single fetch nearly
+        // empty, which otherwise strands the user at the end with nothing to scroll.
+        while addedCount < 5 && attempts < 4 {
+            attempts += 1
+            do {
+                let candidates = try await fetchCandidates()
+                let ranked = await engine.rankBySimilarity(candidates)
+
+                // Compute exclusions AFTER the awaits, so anything that entered the
+                // feed meanwhile is still excluded (no duplicate ForEach IDs).
+                let existingIds = Set(books.map { $0.id })
+                let fresh = ranked.filter {
+                    !existingIds.contains($0.id) && !seenBookIds.contains($0.id)
+                }
+
+                books.append(contentsOf: fresh.prefix(10))
+                addedCount += fresh.count
+            } catch {
+                lastError = error
+            }
+        }
+
+        if addedCount == 0 {
+            // Nothing new — keep content on screen; surface the error only if we have
+            // literally nothing to show.
             if books.isEmpty {
                 books.append(contentsOf: mockBooks())
             }
-            throw error // Re-throw to let caller handle if needed
+            if let lastError = lastError {
+                throw lastError
+            }
         }
+    }
+
+    /// Decides what to fetch: popular rotation during cold start, otherwise a
+    /// mostly on-taste subject with a ~25% exploration fraction to avoid a bubble.
+    private func fetchCandidates() async throws -> [Book] {
+        // Page randomly into the genre so repeated fetches pull *different* books
+        // instead of the same top ~20 results every time (a key cause of running dry).
+        let startIndex = Int.random(in: 0...6) * 20
+
+        guard engine.hasSignals() else {
+            return try await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 20)
+        }
+
+        let explore = Double.random(in: 0...1) < 0.25
+        if explore {
+            return try await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 20)
+        }
+
+        guard let subject = weightedSubject() else {
+            return try await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 20)
+        }
+        return try await booksService.fetchBooks(subject: subject, startIndex: startIndex, maxResults: 20)
+    }
+
+    /// Picks a broad browse subject from the user's top categories, weighted by
+    /// affinity. Weights use the raw category affinity; the fetch uses its
+    /// canonical (broad) subject form.
+    private func weightedSubject() -> String? {
+        let top = engine.topPositiveCategories(limit: 5)
+        guard !top.isEmpty else { return nil }
+
+        let weights = top.map { max(0.05, engine.affinity(for: $0)) }
+        let total = weights.reduce(0, +)
+        guard total > 0 else { return top.randomElement().map { canonicalSubject(for: $0) } }
+
+        var roll = Double.random(in: 0..<total)
+        for (category, weight) in zip(top, weights) {
+            roll -= weight
+            if roll <= 0 { return canonicalSubject(for: category) }
+        }
+        return top.last.map { canonicalSubject(for: $0) }
+    }
+
+    /// Maps a possibly-granular category (e.g. "Psychological Thriller") to a broad
+    /// subject Google Books browses well (e.g. "thriller").
+    private func canonicalSubject(for category: String) -> String {
+        let lower = category.lowercased()
+        if let match = GoogleBooksService.allSubjects.first(where: { lower.contains($0) }) {
+            return match
+        }
+        return lower.split(separator: " ").first.map(String.init) ?? lower
     }
 
     // MARK: - Index Management
@@ -99,26 +178,27 @@ final class DiscoveryViewModel: ObservableObject {
     func updateCurrentIndex(_ newIndex: Int) {
         guard newIndex >= 0 && newIndex < books.count else { return }
         currentIndex = newIndex
-        
-        // Pre-fetch more books if running low
-        if currentIndex >= books.count - prefetchThreshold {
-            prefetchTask?.cancel()
-            prefetchTask = Task { [weak self] in
-                guard let self = self else { return }
-                try? await self.fetchMoreBooks()
-            }
-        }
+        prefetchIfNeeded()
     }
-    
+
+    /// Kicks off a background fetch when the feed is running low. The
+    /// `isFetchingMore` guard (in fetchMoreBooks) keeps this from stacking up.
+    private func prefetchIfNeeded() {
+        guard currentIndex >= books.count - prefetchThreshold, !isFetchingMore else { return }
+        Task { [weak self] in try? await self?.fetchMoreBooks() }
+    }
+
     private func advanceToNext() {
         if currentIndex < books.count - 1 {
             currentIndex += 1
+            prefetchIfNeeded()
         } else {
-            // At the end, try to load more books
-            Task {
-                try? await fetchMoreBooks()
-                if currentIndex < books.count - 1 {
-                    currentIndex += 1
+            // At the very end, fetch then advance once new books arrive.
+            Task { [weak self] in
+                guard let self = self else { return }
+                try? await self.fetchMoreBooks()
+                if self.currentIndex < self.books.count - 1 {
+                    self.currentIndex += 1
                 }
             }
         }
@@ -136,27 +216,64 @@ final class DiscoveryViewModel: ObservableObject {
     func swipeUp() {
         advanceToNext()
     }
-    
+
     func swipeDown() {
         goToPrevious()
     }
 
-    func doubleTap() {
+    /// Swipe right: positive taste signal, save to Library, and advance.
+    func swipeLike() {
         guard let book = currentBook else { return }
+        triggerLikeAnimation()
+        engine.record(book: book, action: .like)
+        recordSwipe(book: book, action: .like)
+        saveToLibrary(book: book)
+        advanceToNext()
+    }
 
-        // Trigger heart animation
+    /// Swipe left: negative taste signal (won't resurface), and advance.
+    func swipeDislike() {
+        guard let book = currentBook else { return }
+        triggerDislikeAnimation()
+        engine.record(book: book, action: .dislike)
+        recordSwipe(book: book, action: .dislike)
+        advanceToNext()
+    }
+
+    /// Like + save the current book without advancing (used by the detail view's
+    /// Save button, which stays on the book).
+    func likeCurrent() {
+        guard let book = currentBook else { return }
+        triggerLikeAnimation()
+        engine.record(book: book, action: .like)
+        recordSwipe(book: book, action: .like)
+        saveToLibrary(book: book)
+    }
+
+    /// Neutral skip — a mild negative signal recorded when the user swipes up past
+    /// a book without judging it. Keeps it from resurfacing.
+    func skipCurrent() {
+        guard let book = currentBook else { return }
+        engine.record(book: book, action: .skip)
+        seenBookIds.insert(book.id)
+    }
+
+    // MARK: - Feedback Animations
+
+    private func triggerLikeAnimation() {
         likeAnimationTrigger = true
         Task {
             try? await Task.sleep(nanoseconds: UInt64(0.8 * 1_000_000_000))
-            await MainActor.run {
-                likeAnimationTrigger = false
-            }
+            await MainActor.run { self.likeAnimationTrigger = false }
         }
+    }
 
-        // Save to library but don't advance - just show the like animation
-        recordSwipe(book: book, action: .like)
-        saveToLibrary(book: book)
-        // Note: Don't advance to next book on double tap - just save it
+    private func triggerDislikeAnimation() {
+        dislikeAnimationTrigger = true
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(0.8 * 1_000_000_000))
+            await MainActor.run { self.dislikeAnimationTrigger = false }
+        }
     }
 
 
@@ -187,17 +304,24 @@ final class DiscoveryViewModel: ObservableObject {
     }
 
     private func saveToLibrary(book: Book) {
-        guard let userId = AuthService.shared.currentUserId else { return }
+        let userId = AuthService.shared.currentUserId ?? Self.localUserId
+        // Durable local save (works offline, no backend needed).
+        LibraryStore.shared.add(book: book, userId: userId, status: .wantToRead)
 
+        // Best-effort server sync for when Supabase auth lands.
+        guard let authedId = AuthService.shared.currentUserId else { return }
         Task { [weak self] in
             guard let self = self else { return }
             _ = try? await self.supabaseService.addUserBook(
-                userId: userId,
+                userId: authedId,
                 googleBooksId: book.id,
                 status: .wantToRead
             )
         }
     }
+
+    /// Stable local user id used before real auth exists.
+    private static let localUserId = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     
     // MARK: - Mock Data (Development)
     
@@ -334,9 +458,5 @@ final class DiscoveryViewModel: ObservableObject {
                 infoLink: nil
             )
         ]
-    }
-    
-    deinit {
-        prefetchTask?.cancel()
     }
 }

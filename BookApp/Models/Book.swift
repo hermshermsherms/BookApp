@@ -30,6 +30,16 @@ struct Book: Identifiable, Codable, Equatable {
         return desc
     }
 
+    /// Text fed to the on-device embedding model to build a semantic vector for
+    /// this book (title + authors + genres + description).
+    var embeddingText: String {
+        var parts: [String] = [title]
+        if !authors.isEmpty { parts.append(authors.joined(separator: ", ")) }
+        if !categories.isEmpty { parts.append(categories.joined(separator: ", ")) }
+        if let description = description, !description.isEmpty { parts.append(description) }
+        return parts.joined(separator: ". ")
+    }
+
     var ratingDisplay: String {
         guard let rating = averageRating else { return "—" }
         return String(format: "%.1f", rating)
@@ -109,6 +119,7 @@ struct VolumeInfo: Codable {
     let publishedDate: String?
     let imageLinks: ImageLinks?
     let infoLink: String?
+    let language: String?
 }
 
 struct ImageLinks: Codable {

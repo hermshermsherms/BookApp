@@ -7,9 +7,6 @@ struct PurchaseSheetView: View {
     let book: Book
     let onDismiss: () -> Void
 
-    @State private var selectedURL: URL?
-    @State private var showSafari = false
-
     var body: some View {
         NavigationView {
             VStack(spacing: Theme.paddingLarge) {
@@ -103,22 +100,13 @@ struct PurchaseSheetView: View {
             }
             #endif
         }
-        #if os(iOS)
-        .interactiveDismissDisabled(showSafari)
-        .sheet(isPresented: $showSafari) {
-            if let url = selectedURL {
-                SafariView(url: url, isPresented: $showSafari)
-            }
-        }
-        #endif
     }
 
     @ViewBuilder
     private func purchaseButton(title: String, icon: String, color: Color, url: URL) -> some View {
         Button {
             #if os(iOS)
-            selectedURL = url
-            showSafari = true
+            PurchaseSheetView.openInAppBrowser(url)
             #else
             // On macOS, open in default browser
             // NSWorkspace.shared.open(url) would be used in real macOS build
@@ -147,43 +135,34 @@ struct PurchaseSheetView: View {
     }
 }
 
-// MARK: - Safari View (iOS only)
+// MARK: - In-app browser (iOS only)
 
 #if os(iOS)
-struct SafariView: UIViewControllerRepresentable {
-    let url: URL
-    @Binding var isPresented: Bool
-
-    func makeUIViewController(context: Context) -> SFSafariViewController {
+extension PurchaseSheetView {
+    /// Presents an in-app Safari browser via UIKit, on top of whatever is currently
+    /// showing. Because it's presented on the UIKit controller stack (not as a nested
+    /// SwiftUI `.sheet`), closing the browser returns to the purchase sheet instead of
+    /// dismissing it.
+    static func openInAppBrowser(_ url: URL) {
+        guard let top = topViewController() else { return }
         let config = SFSafariViewController.Configuration()
         config.entersReaderIfAvailable = false
         config.barCollapsingEnabled = true
         let safariVC = SFSafariViewController(url: url, configuration: config)
-        safariVC.delegate = context.coordinator
-        safariVC.preferredBarTintColor = UIColor.systemBackground
-        safariVC.preferredControlTintColor = UIColor.systemBlue
-        return safariVC
+        safariVC.preferredControlTintColor = UIColor(Theme.accent)
+        top.present(safariVC, animated: true)
     }
 
-    func updateUIViewController(_ uiViewController: SFSafariViewController, context: Context) {}
-    
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-    
-    class Coordinator: NSObject, SFSafariViewControllerDelegate {
-        let parent: SafariView
-        
-        init(_ parent: SafariView) {
-            self.parent = parent
+    private static func topViewController() -> UIViewController? {
+        let keyWindow = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+            .first { $0.isKeyWindow }
+        var top = keyWindow?.rootViewController
+        while let presented = top?.presentedViewController {
+            top = presented
         }
-        
-        func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
-            // Only dismiss the Safari sheet by setting the binding to false
-            DispatchQueue.main.async {
-                self.parent.isPresented = false
-            }
-        }
+        return top
     }
 }
 #endif
