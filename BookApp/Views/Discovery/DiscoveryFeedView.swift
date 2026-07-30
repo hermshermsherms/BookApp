@@ -13,7 +13,7 @@ struct DiscoveryFeedView: View {
 
     var body: some View {
         ZStack {
-            Color.black
+            Theme.background
                 .ignoresSafeArea(.all)
 
             if viewModel.isLoading {
@@ -33,7 +33,7 @@ struct DiscoveryFeedView: View {
                     ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
                         BookCardView(book: book)
                             .frame(width: Self.screenWidth, height: Self.screenHeight)
-                            .background(Color.black)
+                            .background(Theme.background)
                             .clipped()
                             .offset(y: calculateOffset(for: index))
                             .opacity(calculateOpacity(for: index))
@@ -100,10 +100,10 @@ struct DiscoveryFeedView: View {
                     }
                 }
                 
-                // Pre-load next book image (hidden)
+                // Pre-load next book image into the shared cache (hidden)
                 if let nextBook = viewModel.nextBook,
                    let imageURL = nextBook.highQualityImageURL {
-                    AsyncImage(url: imageURL) { _ in
+                    CachedAsyncImage(url: imageURL) { _ in
                         EmptyView()
                     }
                     .frame(width: 0, height: 0)

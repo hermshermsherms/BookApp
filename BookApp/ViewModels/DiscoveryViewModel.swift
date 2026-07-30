@@ -53,12 +53,12 @@ final class DiscoveryViewModel: ObservableObject {
             }
             
             try await fetchMoreBooks()
-            
+
             // If no books were loaded from API, use mock books
             if books.isEmpty {
                 books = mockBooks()
             }
-            
+
             currentIndex = 0
         } catch {
             // If Google Books fails, always use mock data to ensure users see content
@@ -75,8 +75,15 @@ final class DiscoveryViewModel: ObservableObject {
     private func fetchMoreBooks() async throws {
         do {
             let newBooksFromAPI = try await booksService.fetchTrendingBooks(maxResults: 10)
-            let filteredBooks = newBooksFromAPI.filter { !seenBookIds.contains($0.id) }
-            
+            // Exclude books the user has already seen AND anything already in the feed.
+            // Without the in-feed check, a popular title returned by two different genre
+            // batches would appear twice, giving the ForEach duplicate IDs and blanking
+            // the screen.
+            let existingIds = Set(books.map { $0.id })
+            let filteredBooks = newBooksFromAPI.filter {
+                !seenBookIds.contains($0.id) && !existingIds.contains($0.id)
+            }
+
             books.append(contentsOf: filteredBooks)
         } catch {
             // If we have no books at all, add mock books to prevent empty state
@@ -205,8 +212,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.3,
                 pageCount: 400,
                 publishedDate: "2017-06-13",
-                thumbnailURL: "https://books.google.com/books/content?id=cygWzgEACAAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=cygWzgEACAAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/8354226-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/8354226-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -218,8 +225,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.6,
                 pageCount: 482,
                 publishedDate: "2021-05-04",
-                thumbnailURL: "https://books.google.com/books/content?id=NzjhzQEACAAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=NzjhzQEACAAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/11200092-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/11200092-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -231,8 +238,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.1,
                 pageCount: 368,
                 publishedDate: "2020-09-03",
-                thumbnailURL: "https://books.google.com/books/content?id=XVvGzwEACAAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=XVvGzwEACAAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/10201431-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/10201431-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -244,8 +251,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.7,
                 pageCount: 320,
                 publishedDate: "2018-10-16",
-                thumbnailURL: "https://books.google.com/books/content?id=fFCjDwAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=fFCjDwAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/12539702-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/12539702-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -257,8 +264,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.2,
                 pageCount: 336,
                 publishedDate: "2019-02-05",
-                thumbnailURL: "https://books.google.com/books/content?id=RLV5DwAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=RLV5DwAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/9407338-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/9407338-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -270,8 +277,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.4,
                 pageCount: 334,
                 publishedDate: "2018-02-20",
-                thumbnailURL: "https://books.google.com/books/content?id=2ObWDgAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=2ObWDgAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/8314077-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/8314077-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -283,8 +290,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.0,
                 pageCount: 288,
                 publishedDate: "2020-08-13",
-                thumbnailURL: "https://books.google.com/books/content?id=W2ZDDwAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=W2ZDDwAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/10313767-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/10313767-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -296,8 +303,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.3,
                 pageCount: 688,
                 publishedDate: "1965-08-01",
-                thumbnailURL: "https://books.google.com/books/content?id=B1hSG45JCX4C&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=B1hSG45JCX4C&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/6976407-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/6976407-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -309,8 +316,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 3.9,
                 pageCount: 266,
                 publishedDate: "2018-08-28",
-                thumbnailURL: "https://books.google.com/books/content?id=H7GeDAAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=H7GeDAAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/8794265-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/8794265-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -322,8 +329,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.5,
                 pageCount: 448,
                 publishedDate: "2018-11-13",
-                thumbnailURL: "https://books.google.com/books/content?id=hi18DwAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=hi18DwAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/8824664-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/8824664-L.jpg",
                 infoLink: nil
             )
         ]

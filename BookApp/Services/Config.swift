@@ -36,6 +36,18 @@ enum Config {
         }
     }
     
+    /// Google Books API configuration
+    enum GoogleBooks {
+        /// Google Books API key, or `nil` if not configured.
+        /// Set it in `Secrets.swift` (copied from `Secrets.example.swift`).
+        /// Google removed keyless access, so a key is required for live book data.
+        static var apiKey: String? {
+            let key = Secrets.googleBooksAPIKey
+            guard !key.isEmpty, !key.hasPrefix("PASTE_YOUR") else { return nil }
+            return key
+        }
+    }
+
     /// Apple Sign In configuration
     enum Apple {
         /// Services ID for Apple Sign In (should match your Apple Developer Console configuration)

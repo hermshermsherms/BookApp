@@ -9,6 +9,13 @@ struct BookCardView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            // Size the cover relative to the screen so it fills more of the card
+            // and adapts across devices (was a fixed 200×320).
+            let coverWidth = min(geometry.size.width * 0.66, 300)
+            let coverHeight = coverWidth * 1.6
+            let imageWidth = coverWidth - 10
+            let imageHeight = coverHeight - 20
+
             ZStack {
                 // Background
                 Theme.background
@@ -23,9 +30,9 @@ struct BookCardView: View {
                         // Book spine shadow (back)
                         RoundedRectangle(cornerRadius: 8)
                             .fill(Color.black.opacity(0.3))
-                            .frame(width: 200, height: 320)
+                            .frame(width: coverWidth, height: coverHeight)
                             .offset(x: 8, y: 8)
-                        
+
                         // Book spine (side edge)
                         RoundedRectangle(cornerRadius: 8)
                             .fill(LinearGradient(
@@ -36,41 +43,39 @@ struct BookCardView: View {
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ))
-                            .frame(width: 200, height: 320)
+                            .frame(width: coverWidth, height: coverHeight)
                             .offset(x: 4, y: 4)
-                        
+
                         // Main book cover
                         ZStack {
                             // Book background
                             RoundedRectangle(cornerRadius: 8)
                                 .fill(Theme.cardBackground)
                                 .shadow(color: Color.black.opacity(0.2), radius: 15, x: -3, y: 5)
-                            
+
                             // Cover image
-                            AsyncImage(url: highResImageURL) { phase in
+                            CachedAsyncImage(url: highResImageURL) { phase in
                                 switch phase {
                                 case .success(let image):
                                     image
                                         .resizable()
                                         .aspectRatio(contentMode: .fit)
-                                        .frame(width: 190, height: 300)
+                                        .frame(width: imageWidth, height: imageHeight)
                                         .clipShape(RoundedRectangle(cornerRadius: 6))
                                 case .failure:
-                                    fallbackCoverBook()
+                                    fallbackCoverBook(width: imageWidth, height: imageHeight)
                                 case .empty:
                                     ZStack {
                                         RoundedRectangle(cornerRadius: 6)
                                             .fill(Theme.parchment)
-                                            .frame(width: 190, height: 300)
+                                            .frame(width: imageWidth, height: imageHeight)
                                         ProgressView()
                                             .tint(Theme.accent)
                                             .scaleEffect(1.2)
                                     }
-                                @unknown default:
-                                    fallbackCoverBook()
                                 }
                             }
-                            
+
                             // Subtle book cover shine effect
                             LinearGradient(
                                 gradient: Gradient(colors: [
@@ -82,9 +87,9 @@ struct BookCardView: View {
                                 endPoint: .bottomTrailing
                             )
                             .clipShape(RoundedRectangle(cornerRadius: 6))
-                            .frame(width: 190, height: 300)
+                            .frame(width: imageWidth, height: imageHeight)
                         }
-                        .frame(width: 200, height: 320)
+                        .frame(width: coverWidth, height: coverHeight)
                     }
                     
                     // Book info below cover
@@ -101,13 +106,13 @@ struct BookCardView: View {
                         // Title and Author
                         VStack(spacing: 8) {
                             Text(book.title)
-                                .font(Theme.serifBold(24))
+                                .font(Theme.serifBold(28))
                                 .foregroundColor(Theme.primaryText)
                                 .lineLimit(2)
                                 .multilineTextAlignment(.center)
-                            
+
                             Text(book.authorDisplay)
-                                .font(Theme.body(16))
+                                .font(Theme.body(17))
                                 .foregroundColor(Theme.secondaryText)
                         }
                         
@@ -155,7 +160,7 @@ struct BookCardView: View {
     }
 
     @ViewBuilder
-    private func fallbackCoverBook() -> some View {
+    private func fallbackCoverBook(width: CGFloat, height: CGFloat) -> some View {
         ZStack {
             RoundedRectangle(cornerRadius: 6)
                 .fill(LinearGradient(
@@ -166,7 +171,7 @@ struct BookCardView: View {
                     startPoint: .topLeading,
                     endPoint: .bottomTrailing
                 ))
-                .frame(width: 190, height: 300)
+                .frame(width: width, height: height)
             
             VStack(spacing: 16) {
                 Image(systemName: "book.closed.fill")

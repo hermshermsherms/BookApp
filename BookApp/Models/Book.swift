@@ -40,14 +40,25 @@ struct Book: Identifiable, Codable, Equatable {
         return "\(pages) pages"
     }
     
-    /// Returns the highest quality image URL available, falling back gracefully
+    /// Returns the highest quality image URL available, falling back gracefully.
     var highQualityImageURL: URL? {
-        if let largeCoverURL = largeCoverURL, !largeCoverURL.isEmpty {
-            return URL(string: largeCoverURL)
-        } else if let thumbnailURL = thumbnailURL, !thumbnailURL.isEmpty {
-            return URL(string: thumbnailURL)
+        upgradedCoverURL(from: largeCoverURL) ?? upgradedCoverURL(from: thumbnailURL)
+    }
+
+    /// Google's Books API only advertises a ~128px `thumbnail` for most volumes,
+    /// which looks grainy at full-card size. Google actually hosts the full scan,
+    /// so we request a larger render via `&w=` and drop the page-curl effect.
+    /// Non-Google URLs (e.g. Open Library) are returned as-is (https-normalized).
+    private func upgradedCoverURL(from raw: String?) -> URL? {
+        guard let raw = raw, !raw.isEmpty else { return nil }
+        var s = raw.replacingOccurrences(of: "http://", with: "https://")
+        if s.contains("books.google") && s.contains("/books/content") {
+            s = s.replacingOccurrences(of: "&edge=curl", with: "")
+            if !s.contains("w=") {
+                s += "&w=800"
+            }
         }
-        return nil
+        return URL(string: s)
     }
 
     // MARK: - Purchase URLs

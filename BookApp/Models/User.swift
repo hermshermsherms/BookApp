@@ -37,23 +37,20 @@ struct User: Codable, Identifiable {
     var needsOnboarding: Bool {
         return !onboardingCompleted
     }
-<<<<<<< HEAD
 }
 
 /// User profile update request
 struct UserProfileUpdate: Codable {
     let displayName: String?
     let onboardingCompleted: Bool?
-    
+
     enum CodingKeys: String, CodingKey {
         case displayName = "display_name"
         case onboardingCompleted = "onboarding_completed"
     }
-    
+
     init(displayName: String? = nil, onboardingCompleted: Bool? = nil) {
         self.displayName = displayName
         self.onboardingCompleted = onboardingCompleted
     }
-=======
->>>>>>> user-auth
 }

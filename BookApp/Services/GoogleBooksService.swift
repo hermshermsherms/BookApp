@@ -6,8 +6,9 @@ final class GoogleBooksService {
 
     private let baseURL = "https://www.googleapis.com/books/v1/volumes"
 
-    // TODO: Move to environment config before release
-    private let apiKey: String? = nil // Google Books API works without key for basic requests
+    // Google removed keyless access (anonymous requests now return HTTP 429 with a
+    // 0/day quota), so an API key is required. Set it in Secrets.swift.
+    private let apiKey: String? = Config.GoogleBooks.apiKey
 
     private let session: URLSession
     private let decoder: JSONDecoder
@@ -44,10 +45,11 @@ final class GoogleBooksService {
             throw GoogleBooksError.invalidURL
         }
 
-        let encodedQuery = query.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? query
-
+        // Pass the raw query — URLComponents percent-encodes query-item values itself.
+        // Pre-encoding here caused double-encoding (spaces became %2520), which broke
+        // any multi-word subject/query.
         components.queryItems = [
-            URLQueryItem(name: "q", value: encodedQuery),
+            URLQueryItem(name: "q", value: query),
             URLQueryItem(name: "startIndex", value: "\(startIndex)"),
             URLQueryItem(name: "maxResults", value: "\(maxResults)"),
             URLQueryItem(name: "orderBy", value: orderBy),
@@ -64,21 +66,10 @@ final class GoogleBooksService {
             throw GoogleBooksError.invalidURL
         }
 
-        let (data, response) = try await session.data(from: url)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw GoogleBooksError.invalidResponse
-        }
-
-        guard 200...299 ~= httpResponse.statusCode else {
-            if httpResponse.statusCode == 429 {
-                throw GoogleBooksError.rateLimited
-            } else if httpResponse.statusCode == 403 {
-                // API key might be invalid or quota exceeded
-                throw GoogleBooksError.rateLimited
-            }
-            throw GoogleBooksError.httpError(httpResponse.statusCode)
-        }
+        // The Google Books API intermittently returns 503 (and occasionally other
+        // 5xx / 429) for browse-style `subject:` queries, so retry transient failures
+        // with a short backoff before giving up.
+        let data = try await fetchWithRetry(url: url)
 
         let booksResponse = try decoder.decode(GoogleBooksResponse.self, from: data)
 
@@ -90,6 +81,51 @@ final class GoogleBooksService {
         } ?? []
 
         return books
+    }
+
+    // MARK: - Networking
+
+    /// Performs a GET for `url`, retrying transient failures (429 + 5xx) with a
+    /// short exponential backoff. Returns the response body on success.
+    private func fetchWithRetry(url: URL, maxAttempts: Int = 3) async throws -> Data {
+        var lastStatus = 0
+
+        for attempt in 0..<maxAttempts {
+            let (data, response) = try await session.data(from: url)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw GoogleBooksError.invalidResponse
+            }
+
+            let status = httpResponse.statusCode
+            if 200...299 ~= status {
+                return data
+            }
+
+            lastStatus = status
+
+            // Retry on rate-limit / server-side transient errors.
+            let isTransient = status == 429 || (500...599 ~= status)
+            if isTransient, attempt < maxAttempts - 1 {
+                // 0.5s, 1.0s, ... plus jitter to avoid hammering in lockstep.
+                let backoff = Double(attempt + 1) * 0.5 + Double.random(in: 0...0.25)
+                try await Task.sleep(nanoseconds: UInt64(backoff * 1_000_000_000))
+                continue
+            }
+
+            // Non-retryable, or out of attempts.
+            switch status {
+            case 429:
+                throw GoogleBooksError.rateLimited
+            case 403:
+                // API key invalid, quota exceeded, or restricted.
+                throw GoogleBooksError.rateLimited
+            default:
+                throw GoogleBooksError.httpError(status)
+            }
+        }
+
+        throw GoogleBooksError.httpError(lastStatus)
     }
 
     // MARK: - Fetch Book Details

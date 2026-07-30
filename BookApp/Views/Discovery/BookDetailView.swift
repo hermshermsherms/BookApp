@@ -21,7 +21,7 @@ struct BookDetailView: View {
                     // Cover image
                     HStack {
                         Spacer()
-                        AsyncImage(url: highResImageURL) { phase in
+                        CachedAsyncImage(url: highResImageURL) { phase in
                             switch phase {
                             case .success(let image):
                                 image
@@ -38,8 +38,6 @@ struct BookDetailView: View {
                                             .font(.system(size: 40))
                                             .foregroundColor(Theme.muted)
                                     )
-                            @unknown default:
-                                EmptyView()
                             }
                         }
                         .shadow(color: Theme.espresso.opacity(0.2), radius: 12, y: 8)
@@ -148,7 +146,7 @@ struct BookDetailView: View {
                                 HStack(spacing: 14) {
                                     ForEach(similarBooks) { similarBook in
                                         VStack(spacing: 6) {
-                                            AsyncImage(url: similarBook.highQualityImageURL) { phase in
+                                            CachedAsyncImage(url: similarBook.highQualityImageURL) { phase in
                                                 switch phase {
                                                 case .success(let image):
                                                     image
@@ -166,8 +164,6 @@ struct BookDetailView: View {
                                                                 .font(.system(size: 24))
                                                                 .foregroundColor(Theme.muted)
                                                         )
-                                                @unknown default:
-                                                    EmptyView()
                                                 }
                                             }
                                             Text(similarBook.title)
