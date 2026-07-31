@@ -13,6 +13,19 @@ struct DiscoveryFeedView: View {
     private static let screenWidth = UIScreen.main.bounds.width
     private static let screenHeight = UIScreen.main.bounds.height
 
+    /// De-duplicated books for the ForEach — a last line of defense against
+    /// duplicate IDs, which make SwiftUI render a blank screen.
+    private var feedBooks: [Book] {
+        var seen = Set<String>()
+        return viewModel.books.filter { seen.insert($0.id).inserted }
+    }
+
+    /// currentPage clamped into range, so a card is always visible.
+    private var clampedPage: Int {
+        guard !feedBooks.isEmpty else { return 0 }
+        return min(max(currentPage, 0), feedBooks.count - 1)
+    }
+
     var body: some View {
         ZStack {
             Theme.background
@@ -32,7 +45,7 @@ struct DiscoveryFeedView: View {
             } else if !viewModel.books.isEmpty {
                 // Instagram Reels-style fluid swipe container
                 ZStack {
-                    ForEach(Array(viewModel.books.enumerated()), id: \.element.id) { index, book in
+                    ForEach(Array(feedBooks.enumerated()), id: \.element.id) { index, book in
                         BookCardView(book: book)
                             .frame(width: Self.screenWidth, height: Self.screenHeight)
                             .background(Theme.background)
@@ -206,7 +219,7 @@ struct DiscoveryFeedView: View {
     private func handleVerticalEnd(height verticalMovement: CGFloat) {
         var targetPage = currentPage
 
-        if verticalMovement < -Self.swipeThreshold && currentPage < viewModel.books.count - 1 {
+        if verticalMovement < -Self.swipeThreshold && currentPage < feedBooks.count - 1 {
             targetPage = currentPage + 1   // swipe up → next
         } else if verticalMovement > Self.swipeThreshold && currentPage > 0 {
             targetPage = currentPage - 1   // swipe down → previous
@@ -269,22 +282,23 @@ struct DiscoveryFeedView: View {
     }
 
     private func calculateOffset(for index: Int) -> CGFloat {
-        let currentOffset = CGFloat(index - currentPage) * Self.screenHeight
-        
+        let page = clampedPage
+        let currentOffset = CGFloat(index - page) * Self.screenHeight
+
         if isDragging {
             // During drag, apply the drag offset only to the current and adjacent cards
-            if index == currentPage {
+            if index == page {
                 return currentOffset + dragOffset
-            } else if index == currentPage + 1 || index == currentPage - 1 {
+            } else if index == page + 1 || index == page - 1 {
                 return currentOffset + dragOffset
             }
         }
-        
+
         return currentOffset
     }
-    
+
     private func calculateOpacity(for index: Int) -> Double {
-        let distance = abs(index - currentPage)
+        let distance = abs(index - clampedPage)
         
         if distance > 2 {
             return 0.0
@@ -296,7 +310,7 @@ struct DiscoveryFeedView: View {
     }
     
     private func calculateScale(for index: Int) -> CGFloat {
-        let distance = abs(index - currentPage)
+        let distance = abs(index - clampedPage)
         
         if distance > 2 {
             return 0.8

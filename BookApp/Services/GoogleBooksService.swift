@@ -43,6 +43,12 @@ final class GoogleBooksService {
         try await searchBooks(query: "subject:\(subject)", startIndex: startIndex, maxResults: maxResults, orderBy: "relevance")
     }
 
+    /// Fetches more books by a specific author — used to retrieve candidates from
+    /// the user's favorite authors.
+    func fetchByAuthor(_ author: String, startIndex: Int = 0, maxResults: Int = 20) async throws -> [Book] {
+        try await searchBooks(query: "inauthor:\(author)", startIndex: startIndex, maxResults: maxResults, orderBy: "relevance")
+    }
+
     // MARK: - Search Books
 
     /// Search books by title, author, or general query

@@ -272,6 +272,15 @@ final class RecommendationEngine: ObservableObject {
             .map { $0.key }
     }
 
+    /// The user's most-liked authors (positive affinity only), strongest first.
+    func topPositiveAuthors(limit: Int) -> [String] {
+        authorAffinity
+            .filter { $0.value > 0 && $0.key != "Unknown Author" }
+            .sorted { $0.value > $1.value }
+            .prefix(limit)
+            .map { $0.key }
+    }
+
     /// Affinity weight for a category (0 if unknown) — used for weighted subject picks.
     func affinity(for category: String) -> Double {
         categoryAffinity[category] ?? 0

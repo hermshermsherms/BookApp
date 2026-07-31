@@ -137,7 +137,7 @@ struct BookDetailView: View {
                     // Similar Books
                     if !similarBooks.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("You Might Also Like")
+                            Text("Similar Books")
                                 .font(Theme.serifBold(18))
                                 .foregroundColor(Theme.primaryText)
                                 .padding(.horizontal)
@@ -225,19 +225,35 @@ struct BookDetailView: View {
     private func loadSimilarBooks() async {
         isLoadingSimilar = true
         do {
-            similarBooks = try await GoogleBooksService.shared.fetchSimilarBooks(to: book)
-            // If no similar books found, try a broader search
-            if similarBooks.isEmpty {
-                similarBooks = try await GoogleBooksService.shared.fetchTrendingBooks(maxResults: 6)
+            // Retrieve candidates by shared author/genre, then rank by how semantically
+            // close they are to this book (embedding similarity).
+            var candidates = try await GoogleBooksService.shared.fetchSimilarBooks(to: book, maxResults: 20)
+            if candidates.isEmpty {
+                candidates = try await GoogleBooksService.shared.fetchTrendingBooks(maxResults: 20)
                     .filter { $0.id != book.id }
-                    .prefix(4)
-                    .map { $0 }
             }
+            similarBooks = await rankedBySimilarity(candidates)
         } catch {
             // Fallback to some mock similar books to maintain consistency
             similarBooks = mockSimilarBooks()
         }
         isLoadingSimilar = false
+    }
+
+    /// Sorts candidates by embedding similarity to the current book (falls back to
+    /// the given order if embeddings are unavailable).
+    private func rankedBySimilarity(_ candidates: [Book]) async -> [Book] {
+        let pool = candidates.filter { $0.id != book.id }
+        guard let reference = await EmbeddingService.shared.embed(id: book.id, text: book.embeddingText) else {
+            return Array(pool.prefix(10))
+        }
+        var scored: [(book: Book, score: Double)] = []
+        for candidate in pool {
+            let vector = await EmbeddingService.shared.embed(id: candidate.id, text: candidate.embeddingText)
+            let similarity = vector.map { EmbeddingService.cosine($0, reference) } ?? 0
+            scored.append((candidate, similarity))
+        }
+        return scored.sorted { $0.score > $1.score }.prefix(10).map { $0.book }
     }
     
     private func mockSimilarBooks() -> [Book] {

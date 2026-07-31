@@ -5,6 +5,8 @@ struct LibraryView: View {
     @State private var selectedTab: BookStatus = .wantToRead
     @State private var showSearch = false
     @State private var showReview: UserBook?
+    @State private var detailBook: Book?
+    @State private var purchaseBook: Book?
 
     var body: some View {
         NavigationView {
@@ -46,6 +48,11 @@ struct LibraryView: View {
                                         }
                                     )
                                     .onTapGesture {
+                                        // Tap opens the detail sheet (read more / buy).
+                                        detailBook = userBook.book
+                                    }
+                                    .onLongPressGesture {
+                                        // Long-press a finished book to write/edit a review.
                                         if userBook.status == .read {
                                             showReview = userBook
                                         }
@@ -77,6 +84,25 @@ struct LibraryView: View {
         }
         .sheet(item: $showReview) { userBook in
             ReviewView(userBook: userBook)
+        }
+        .sheet(item: $detailBook) { book in
+            BookDetailView(
+                book: book,
+                onLike: { detailBook = nil },
+                onBuy: {
+                    let selected = book
+                    detailBook = nil
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        purchaseBook = selected
+                    }
+                },
+                onDislike: { detailBook = nil }
+            )
+        }
+        .sheet(item: $purchaseBook) { book in
+            PurchaseSheetView(book: book) { purchaseBook = nil }
+                .presentationDetents([.height(400), .medium])
+                .presentationDragIndicator(.visible)
         }
         .task {
             await viewModel.fetchLibrary()

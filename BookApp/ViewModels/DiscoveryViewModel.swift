@@ -125,23 +125,43 @@ final class DiscoveryViewModel: ObservableObject {
     /// Decides what to fetch: popular rotation during cold start, otherwise a
     /// mostly on-taste subject with a ~25% exploration fraction to avoid a bubble.
     private func fetchCandidates() async throws -> [Book] {
-        // Page randomly into the genre so repeated fetches pull *different* books
-        // instead of the same top ~20 results every time (a key cause of running dry).
+        // Page randomly into results so repeated fetches pull *different* books
+        // instead of the same top ~20 every time (a key cause of running dry).
         let startIndex = Int.random(in: 0...6) * 20
 
+        // Cold start — popular rotation, a big page.
         guard engine.hasSignals() else {
-            return try await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 20)
+            return try await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 40)
         }
 
-        let explore = Double.random(in: 0...1) < 0.25
-        if explore {
-            return try await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 20)
-        }
+        // Warm: gather a large, interest-driven pool from several sources at once —
+        // your top genre, a favorite author, and some exploration.
+        async let genre = genreCandidates(startIndex: startIndex)
+        async let author = authorCandidates()
+        async let exploration = explorationCandidates()
 
-        guard let subject = weightedSubject() else {
-            return try await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 20)
+        let combined = await genre + author + exploration
+        var seen = Set<String>()
+        let unique = combined.filter { seen.insert($0.id).inserted }
+
+        if unique.isEmpty { throw GoogleBooksError.noResults }
+        return unique
+    }
+
+    private func genreCandidates(startIndex: Int) async -> [Book] {
+        if let subject = weightedSubject() {
+            return (try? await booksService.fetchBooks(subject: subject, startIndex: startIndex, maxResults: 40)) ?? []
         }
-        return try await booksService.fetchBooks(subject: subject, startIndex: startIndex, maxResults: 20)
+        return (try? await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 40)) ?? []
+    }
+
+    private func authorCandidates() async -> [Book] {
+        guard let author = engine.topPositiveAuthors(limit: 3).randomElement() else { return [] }
+        return (try? await booksService.fetchByAuthor(author, maxResults: 20)) ?? []
+    }
+
+    private func explorationCandidates() async -> [Book] {
+        (try? await booksService.fetchTrendingBooks(startIndex: Int.random(in: 0...6) * 20, maxResults: 20)) ?? []
     }
 
     /// Picks a broad browse subject from the user's top categories, weighted by

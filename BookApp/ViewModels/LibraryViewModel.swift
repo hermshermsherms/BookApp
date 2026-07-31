@@ -31,6 +31,10 @@ final class LibraryViewModel: ObservableObject {
 
     func updateStatus(userBook: UserBook, newStatus: BookStatus) async {
         libraryStore.updateStatus(id: userBook.id, status: newStatus)
+        // Finishing a book is a strong positive taste signal.
+        if newStatus == .read, let book = userBook.book {
+            RecommendationEngine.shared.record(book: book, action: .like)
+        }
         await fetchLibrary()
     }
 
@@ -42,6 +46,23 @@ final class LibraryViewModel: ObservableObject {
     }
 
     // MARK: - Search (Manual Add)
+
+    private var searchTask: Task<Void, Never>?
+
+    /// Debounced search — call on every keystroke; runs the query after a short pause.
+    func searchDebounced() {
+        searchTask?.cancel()
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
+            searchResults = []
+            return
+        }
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.searchBooks()
+        }
+    }
 
     func searchBooks() async {
         guard !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty else {
