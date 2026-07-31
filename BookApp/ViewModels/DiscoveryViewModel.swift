@@ -103,9 +103,11 @@ final class DiscoveryViewModel: ObservableObject {
                     !existingIds.contains($0.id) && !seenBookIds.contains($0.id)
                 }
 
-                // Spread same-author books apart so one favorite author can't flood
-                // the feed (the "gap" rule).
-                let diversified = applyAuthorGap(fresh, take: 10)
+                // Mix in variety so lower-ranked exploration/modern books surface
+                // instead of being buried by the taste-match ranking, then spread
+                // same-author books apart (the "gap" rule).
+                let mixed = mixExploreExploit(fresh)
+                let diversified = applyAuthorGap(mixed, take: 10)
                 books.append(contentsOf: diversified)
                 addedCount += diversified.count
             } catch {
@@ -138,17 +140,28 @@ final class DiscoveryViewModel: ObservableObject {
         }
 
         // Warm: gather a large, interest-driven pool from several sources at once —
-        // your top genre, a favorite author, and some exploration.
+        // your top genre, a favorite author, exploration, and modern releases.
         async let genre = genreCandidates(startIndex: startIndex)
         async let author = authorCandidates()
         async let exploration = explorationCandidates()
+        async let modern = modernCandidates()
 
-        let combined = await genre + author + exploration
+        let combined = await genre + author + exploration + modern
         var seen = Set<String>()
         let unique = combined.filter { seen.insert($0.id).inserted }
 
         if unique.isEmpty { throw GoogleBooksError.noResults }
         return unique
+    }
+
+    /// Recent, mainstream-friendly books so the feed isn't all older classics.
+    /// Pulls quality (relevance-ranked) results from broad contemporary genres and
+    /// keeps only those published in roughly the last 15 years.
+    private func modernCandidates() async -> [Book] {
+        let modernSubjects = ["fiction", "thriller", "romance", "science fiction", "mystery", "fantasy", "young adult"]
+        let subject = modernSubjects.randomElement() ?? "fiction"
+        let books = (try? await booksService.fetchBooks(subject: subject, startIndex: Int.random(in: 0...2) * 20, maxResults: 40)) ?? []
+        return books.filter { ($0.publicationYear ?? 0) >= 2010 }
     }
 
     private func genreCandidates(startIndex: Int) async -> [Book] {
@@ -166,6 +179,17 @@ final class DiscoveryViewModel: ObservableObject {
 
     private func explorationCandidates() async -> [Book] {
         (try? await booksService.fetchTrendingBooks(startIndex: Int.random(in: 0...3) * 20, maxResults: 20)) ?? []
+    }
+
+    /// Guarantees variety: keeps the strongest taste-matches on top but shuffles the
+    /// long tail, so exploration/modern books (which rank lower) still break through
+    /// instead of the feed being 100% on-taste classics.
+    private func mixExploreExploit(_ ranked: [Book]) -> [Book] {
+        let exploitCount = 7
+        guard ranked.count > exploitCount else { return ranked }
+        let top = Array(ranked.prefix(exploitCount))
+        let rest = Array(ranked.dropFirst(exploitCount)).shuffled()
+        return top + rest
     }
 
     /// Author "gap" rule: skips a candidate whose primary author already appears

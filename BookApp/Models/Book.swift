@@ -23,6 +23,12 @@ struct Book: Identifiable, Codable, Equatable {
         authors.first ?? "Unknown"
     }
 
+    /// Publication year parsed from the (string) published date, if available.
+    var publicationYear: Int? {
+        guard let publishedDate = publishedDate, publishedDate.count >= 4 else { return nil }
+        return Int(publishedDate.prefix(4))
+    }
+
     var genreDisplay: String {
         categories.first ?? "General"
     }
