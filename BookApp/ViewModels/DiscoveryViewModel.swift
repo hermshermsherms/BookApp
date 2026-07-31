@@ -130,7 +130,7 @@ final class DiscoveryViewModel: ObservableObject {
     private func fetchCandidates() async throws -> [Book] {
         // Page randomly into results so repeated fetches pull *different* books
         // instead of the same top ~20 every time (a key cause of running dry).
-        let startIndex = Int.random(in: 0...6) * 20
+        let startIndex = Int.random(in: 0...3) * 20
 
         // Cold start — popular rotation, a big page.
         guard engine.hasSignals() else {
@@ -165,7 +165,7 @@ final class DiscoveryViewModel: ObservableObject {
     }
 
     private func explorationCandidates() async -> [Book] {
-        (try? await booksService.fetchTrendingBooks(startIndex: Int.random(in: 0...6) * 20, maxResults: 20)) ?? []
+        (try? await booksService.fetchTrendingBooks(startIndex: Int.random(in: 0...3) * 20, maxResults: 20)) ?? []
     }
 
     /// Author "gap" rule: skips a candidate whose primary author already appears

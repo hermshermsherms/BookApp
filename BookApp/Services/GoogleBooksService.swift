@@ -90,8 +90,15 @@ final class GoogleBooksService {
             // actual language to keep translated/foreign editions out of the feed.
             guard item.volumeInfo.language == "en" else { return nil }
             let book = item.toBook()
-            // Filter out books without covers or descriptions
-            guard book.thumbnailURL != nil, book.description != nil else { return nil }
+            guard book.thumbnailURL != nil, let description = book.description else { return nil }
+
+            // Skip auto-generated public-domain reprints (e.g. "Forgotten Books"),
+            // which have thin "Excerpt from …" blurbs and low-resolution scans.
+            let trimmed = description.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.count >= 80 else { return nil }
+            let lower = trimmed.lowercased()
+            guard !lower.hasPrefix("excerpt from"), !lower.contains("forgotten books") else { return nil }
+
             return book
         } ?? []
 

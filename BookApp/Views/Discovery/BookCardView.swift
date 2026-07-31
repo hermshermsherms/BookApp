@@ -23,8 +23,10 @@ struct BookCardView: View {
                 
                 // Card container
                 VStack(spacing: 24) {
-                    Spacer()
-                    
+                    // Small top gap (rather than a full flexible Spacer) so the whole
+                    // card sits higher on screen.
+                    Spacer().frame(maxHeight: 70)
+
                     // Book cover - realistic book shape with 3D effect
                     ZStack {
                         // Book spine shadow (back)
@@ -94,15 +96,6 @@ struct BookCardView: View {
                     
                     // Book info below cover
                     VStack(spacing: 16) {
-                        // Genre tag
-                        Text(book.genreDisplay.uppercased())
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(Theme.accent)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Theme.accent.opacity(0.1))
-                            .cornerRadius(6)
-                        
                         // Title and Author
                         VStack(spacing: 8) {
                             Text(book.title)
@@ -115,9 +108,9 @@ struct BookCardView: View {
                                 .font(Theme.body(17))
                                 .foregroundColor(Theme.secondaryText)
                         }
-                        
-                        // Rating + Page count row
-                        HStack(spacing: 24) {
+
+                        // Rating + Page count + Category row
+                        HStack(spacing: 20) {
                             if book.averageRating != nil {
                                 HStack(spacing: 4) {
                                     Image(systemName: "star.fill")
@@ -128,7 +121,7 @@ struct BookCardView: View {
                                         .foregroundColor(Theme.primaryText)
                                 }
                             }
-                            
+
                             if book.pageCount != nil {
                                 HStack(spacing: 4) {
                                     Image(systemName: "book.pages")
@@ -139,14 +132,24 @@ struct BookCardView: View {
                                         .foregroundColor(Theme.muted)
                                 }
                             }
+
+                            HStack(spacing: 4) {
+                                Image(systemName: "tag.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Theme.accent)
+                                Text(book.genreDisplay.uppercased())
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(Theme.accent)
+                                    .lineLimit(1)
+                            }
                         }
-                        
+
                         // Hook / description
-                        if !book.hook.isEmpty {
-                            Text(book.hook)
+                        if let description = book.description, !description.isEmpty {
+                            Text(description)
                                 .font(Theme.body(15))
                                 .foregroundColor(Theme.secondaryText)
-                                .lineLimit(3)
+                                .lineLimit(4)
                                 .multilineTextAlignment(.center)
                                 .padding(.top, 4)
                         }
