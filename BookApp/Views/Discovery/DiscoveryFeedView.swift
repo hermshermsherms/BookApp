@@ -55,6 +55,9 @@ struct DiscoveryFeedView: View {
                             .rotationEffect(.degrees(calculateRotation(for: index)))
                             .opacity(calculateOpacity(for: index))
                             .scaleEffect(calculateScale(for: index))
+                            .onTapGesture(count: 2) {
+                                viewModel.likeCurrent()
+                            }
                             .onTapGesture {
                                 viewModel.singleTap()
                             }

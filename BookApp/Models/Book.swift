@@ -18,6 +18,11 @@ struct Book: Identifiable, Codable, Equatable {
         authors.joined(separator: ", ")
     }
 
+    /// Primary author, used for feed author-diversity (the "gap" rule).
+    var primaryAuthor: String {
+        authors.first ?? "Unknown"
+    }
+
     var genreDisplay: String {
         categories.first ?? "General"
     }

@@ -103,8 +103,11 @@ final class DiscoveryViewModel: ObservableObject {
                     !existingIds.contains($0.id) && !seenBookIds.contains($0.id)
                 }
 
-                books.append(contentsOf: fresh.prefix(10))
-                addedCount += fresh.count
+                // Spread same-author books apart so one favorite author can't flood
+                // the feed (the "gap" rule).
+                let diversified = applyAuthorGap(fresh, take: 10)
+                books.append(contentsOf: diversified)
+                addedCount += diversified.count
             } catch {
                 lastError = error
             }
@@ -157,11 +160,37 @@ final class DiscoveryViewModel: ObservableObject {
 
     private func authorCandidates() async -> [Book] {
         guard let author = engine.topPositiveAuthors(limit: 3).randomElement() else { return [] }
-        return (try? await booksService.fetchByAuthor(author, maxResults: 20)) ?? []
+        // Keep this modest so a single author can't dominate the candidate pool.
+        return (try? await booksService.fetchByAuthor(author, maxResults: 8)) ?? []
     }
 
     private func explorationCandidates() async -> [Book] {
         (try? await booksService.fetchTrendingBooks(startIndex: Int.random(in: 0...6) * 20, maxResults: 20)) ?? []
+    }
+
+    /// Author "gap" rule: skips a candidate whose primary author already appears
+    /// within the last `authorGap` books of the feed, so no single author clusters
+    /// or floods. Deferred books are used only to avoid coming up short.
+    private func applyAuthorGap(_ candidates: [Book], take: Int) -> [Book] {
+        let authorGap = 6
+        var recentAuthors = books.map { $0.primaryAuthor }
+        var picked: [Book] = []
+        var deferred: [Book] = []
+
+        for book in candidates {
+            if recentAuthors.suffix(authorGap).contains(book.primaryAuthor) {
+                deferred.append(book)
+            } else {
+                picked.append(book)
+                recentAuthors.append(book.primaryAuthor)
+                if picked.count >= take { break }
+            }
+        }
+
+        if picked.count < take {
+            picked.append(contentsOf: deferred.prefix(take - picked.count))
+        }
+        return picked
     }
 
     /// Picks a broad browse subject from the user's top categories, weighted by
