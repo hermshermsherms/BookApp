@@ -34,7 +34,14 @@ struct MainTabView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
+            // The feed is a full-bleed dark surface, so this tab pins the bar
+            // opaque and dark instead of inheriting the light default that suits
+            // Library and Profile. Pinning it also stops UIKit swapping between
+            // its standard and scroll-edge appearances while the feed is paging.
             DiscoveryFeedView()
+                .toolbarBackground(.visible, for: .tabBar)
+                .toolbarBackground(Theme.feedChrome, for: .tabBar)
+                .toolbarColorScheme(.dark, for: .tabBar)
                 .tabItem {
                     Label("Discover", systemImage: "book.fill")
                 }

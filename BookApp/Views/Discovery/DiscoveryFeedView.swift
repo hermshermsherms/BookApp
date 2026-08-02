@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 private enum DiscoveryRoute: Hashable {
@@ -61,25 +62,34 @@ private struct DiscoveryPagerView: View {
     @State private var currentPage = 0
     @State private var dragOffset: CGFloat = 0
     @State private var isDragging = false
+    /// De-duplicated snapshot of `viewModel.books`. Recomputing the filter inside
+    /// `body` meant walking the whole feed and building a `Set` on every frame of
+    /// every swipe; the feed only changes when the view model publishes.
+    @State private var feedBooks: [Book] = []
 
     let onBrowseSimilar: (Book, Book, [Book]) -> Void
     let onReadEPUB: (Book, BookReadingResource) -> Void
 
     private static let swipeThreshold: CGFloat = 80
+    /// A fast flick can cross well under `swipeThreshold` before the finger lifts.
+    /// Pagination also honours the projected end point so flicks page immediately
+    /// instead of springing back.
+    private static let flickThreshold: CGFloat = 190
 
     init(
         seedBooks: [Book] = [],
         onBrowseSimilar: @escaping (Book, Book, [Book]) -> Void,
         onReadEPUB: @escaping (Book, BookReadingResource) -> Void
     ) {
-        _viewModel = StateObject(wrappedValue: DiscoveryViewModel(seedBooks: seedBooks))
+        var seen = Set<String>()
+        let unique = seedBooks.filter { seen.insert($0.id).inserted }
+        _viewModel = StateObject(wrappedValue: DiscoveryViewModel(seedBooks: unique))
+        // Seeded up front so a similar-books feed renders its first card
+        // immediately rather than flashing the empty state for a frame while the
+        // view model's first publish lands.
+        _feedBooks = State(initialValue: unique)
         self.onBrowseSimilar = onBrowseSimilar
         self.onReadEPUB = onReadEPUB
-    }
-
-    private var feedBooks: [Book] {
-        var seen = Set<String>()
-        return viewModel.books.filter { seen.insert($0.id).inserted }
     }
 
     private var clampedPage: Int {
@@ -113,6 +123,10 @@ private struct DiscoveryPagerView: View {
                 .presentationDragIndicator(.visible)
             }
         }
+        .onReceive(viewModel.$books) { books in
+            var seen = Set<String>()
+            feedBooks = books.filter { seen.insert($0.id).inserted }
+        }
         .task {
             await viewModel.loadFeedIfNeeded()
             currentPage = viewModel.currentIndex
@@ -131,26 +145,22 @@ private struct DiscoveryPagerView: View {
             .frame(width: pageWidth, height: size.height)
             .clipped()
 
-            ForEach(Array(feedBooks.enumerated()), id: \.element.id) { index, book in
-                BookCardView(
-                    book: book,
-                    catalog: feedBooks,
-                    isCurrent: index == clampedPage,
-                    onSave: { viewModel.likeCurrent() },
-                    onBuy: { viewModel.buyBook() },
-                    onSkip: { advanceBySkipping() },
-                    onBrowseSimilar: { selected, catalog in
-                        onBrowseSimilar(book, selected, catalog)
-                    },
-                    onReadEPUB: { resource in
-                        onReadEPUB(book, resource)
-                    }
-                )
-                .frame(width: pageWidth, height: size.height)
-                .clipped()
-                .offset(y: calculateOffset(for: index, pageHeight: size.height))
-                .opacity(calculateOpacity(for: index))
-            }
+            // `.equatable()` keeps the card bodies from being re-evaluated on every
+            // frame of a drag: the cards only depend on which page is current, and
+            // the live drag translation is applied as a plain offset on top.
+            FeedCardStack(
+                books: feedBooks,
+                currentPage: clampedPage,
+                pageWidth: pageWidth,
+                pageHeight: size.height,
+                onSave: { viewModel.likeCurrent() },
+                onBuy: { viewModel.buyBook() },
+                onSkip: { advanceBySkipping() },
+                onBrowseSimilar: onBrowseSimilar,
+                onReadEPUB: onReadEPUB
+            )
+            .equatable()
+            .offset(y: dragOffset)
 
             feedbackOverlay
         }
@@ -158,12 +168,21 @@ private struct DiscoveryPagerView: View {
         .clipped()
         .contentShape(Rectangle())
         .gesture(pagingGesture)
+        .task(id: clampedPage) {
+            await BackdropImageCache.prewarm(neighbourBackdropURLs)
+        }
         .onChange(of: viewModel.currentIndex) { newIndex in
             guard newIndex != currentPage else { return }
             withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
                 currentPage = newIndex
             }
         }
+    }
+
+    private var neighbourBackdropURLs: [URL] {
+        [clampedPage - 1, clampedPage + 1]
+            .filter { $0 >= 0 && $0 < feedBooks.count }
+            .compactMap { feedBooks[$0].highQualityImageURL }
     }
 
     private var transitionBook: Book? {
@@ -178,7 +197,10 @@ private struct DiscoveryPagerView: View {
     }
 
     private var pagingGesture: some Gesture {
-        DragGesture(minimumDistance: 16)
+        // A short activation distance keeps the card glued to the finger. The 3D
+        // cover's own pan recogniser now stands down for vertical drags, so this
+        // no longer has to out-wait it.
+        DragGesture(minimumDistance: 6)
             .onChanged { value in
                 let height = value.translation.height
                 if abs(height) > abs(value.translation.width) {
@@ -188,7 +210,7 @@ private struct DiscoveryPagerView: View {
             }
             .onEnded { value in
                 if abs(value.translation.height) > abs(value.translation.width) {
-                    handleVerticalEnd(height: value.translation.height)
+                    handleVerticalEnd(value)
                 } else {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                         dragOffset = 0
@@ -198,11 +220,18 @@ private struct DiscoveryPagerView: View {
             }
     }
 
-    private func handleVerticalEnd(height: CGFloat) {
+    private func handleVerticalEnd(_ value: DragGesture.Value) {
+        let height = value.translation.height
+        let projected = value.predictedEndTranslation.height
+        // The projected sign is the release velocity's direction, so a drag that
+        // is flicked back the way it came still springs home instead of paging.
+        let wantsNext = (height < -Self.swipeThreshold && projected <= 0) || projected < -Self.flickThreshold
+        let wantsPrevious = (height > Self.swipeThreshold && projected >= 0) || projected > Self.flickThreshold
+
         var target = currentPage
-        if height < -Self.swipeThreshold, currentPage < feedBooks.count - 1 {
+        if wantsNext, currentPage < feedBooks.count - 1 {
             target += 1
-        } else if height > Self.swipeThreshold, currentPage > 0 {
+        } else if wantsPrevious, currentPage > 0 {
             target -= 1
         }
 
@@ -230,16 +259,6 @@ private struct DiscoveryPagerView: View {
             currentPage = target
         }
         viewModel.updateCurrentIndex(target)
-    }
-
-    private func calculateOffset(for index: Int, pageHeight: CGFloat) -> CGFloat {
-        let currentOffset = CGFloat(index - clampedPage) * pageHeight
-        guard isDragging, abs(index - clampedPage) <= 1 else { return currentOffset }
-        return currentOffset + dragOffset
-    }
-
-    private func calculateOpacity(for index: Int) -> Double {
-        abs(index - clampedPage) > 1 ? 0 : 1
     }
 
     @ViewBuilder
@@ -301,6 +320,90 @@ private struct DiscoveryPagerView: View {
     }
 }
 
+/// The page window rendered at any one time.
+///
+/// Every card hosts a live SceneKit renderer for the 3D cover. The feed grows to
+/// 30+ books, and materialising a card per book meant 30 simultaneous SCNViews
+/// all running their own 60fps render loop — which is what made fast swipes
+/// stutter while slow ones tracked fine. Keeping one page behind and two ahead
+/// caps that at four, and pre-warms the next renderer off-screen so paging into
+/// it never hitches.
+private struct FeedCardStack: View, Equatable {
+    let books: [Book]
+    let currentPage: Int
+    let pageWidth: CGFloat
+    let pageHeight: CGFloat
+    let onSave: () -> Void
+    let onBuy: () -> Void
+    let onSkip: () -> Void
+    let onBrowseSimilar: (Book, Book, [Book]) -> Void
+    let onReadEPUB: (Book, BookReadingResource) -> Void
+
+    private static let pagesBehind = 1
+    private static let pagesAhead = 2
+
+    /// Identified by book id, not by index, so a card keeps its state (loaded
+    /// cover, similar books, expanded synopsis) as the window slides over it.
+    private struct Page: Identifiable {
+        let index: Int
+        let book: Book
+        var id: String { book.id }
+    }
+
+    private var window: [Page] {
+        guard !books.isEmpty else { return [] }
+        let lower = max(0, currentPage - Self.pagesBehind)
+        let upper = min(books.count - 1, currentPage + Self.pagesAhead)
+        guard lower <= upper else { return [] }
+        return (lower...upper).map { Page(index: $0, book: books[$0]) }
+    }
+
+    var body: some View {
+        ZStack {
+            ForEach(window) { entry in
+                let distance = abs(entry.index - currentPage)
+                BookCardView(
+                    book: entry.book,
+                    catalog: books,
+                    isCurrent: entry.index == currentPage,
+                    // Only the page you can actually see keeps its renderer alive.
+                    isRendering: distance <= 1,
+                    onSave: onSave,
+                    onBuy: onBuy,
+                    onSkip: onSkip,
+                    onBrowseSimilar: { selected, catalog in
+                        onBrowseSimilar(entry.book, selected, catalog)
+                    },
+                    onReadEPUB: { resource in
+                        onReadEPUB(entry.book, resource)
+                    }
+                )
+                .frame(width: pageWidth, height: pageHeight)
+                .clipped()
+                .offset(y: CGFloat(entry.index - currentPage) * pageHeight)
+                .opacity(distance <= 1 ? 1 : 0)
+                // Cards entering/leaving the window must not fade — they'd flash
+                // through the card that is paging into view.
+                .transition(.identity)
+            }
+        }
+        .frame(width: pageWidth, height: pageHeight)
+    }
+
+    /// The closures are deliberately excluded: they capture only stable
+    /// references (the view model and the navigation callbacks), and comparing
+    /// them is impossible. The feed itself is append-only, so count plus the
+    /// first/last ids identify it.
+    static func == (lhs: FeedCardStack, rhs: FeedCardStack) -> Bool {
+        lhs.currentPage == rhs.currentPage
+            && lhs.pageWidth == rhs.pageWidth
+            && lhs.pageHeight == rhs.pageHeight
+            && lhs.books.count == rhs.books.count
+            && lhs.books.first?.id == rhs.books.first?.id
+            && lhs.books.last?.id == rhs.books.last?.id
+    }
+}
+
 private struct CoverBackdropView: View {
     let currentURL: URL?
     let transitionURL: URL?
@@ -308,11 +411,16 @@ private struct CoverBackdropView: View {
 
     var body: some View {
         ZStack {
-            backdropImage(url: currentURL)
-                .opacity(1 - transitionProgress)
+            Color.black
 
+            BackdropLayer(url: currentURL)
+
+            // The incoming backdrop fades in *over* the current one rather than
+            // cross-fading with it. A cross-fade dips through the black base
+            // whenever the incoming layer hasn't decoded yet, which read as the
+            // background dropping out mid-swipe.
             if let transitionURL {
-                backdropImage(url: transitionURL)
+                BackdropLayer(url: transitionURL)
                     .opacity(transitionProgress)
             }
 
@@ -326,24 +434,46 @@ private struct CoverBackdropView: View {
                 endPoint: .bottom
             )
         }
-        .ignoresSafeArea()
         .allowsHitTesting(false)
-        .animation(.linear(duration: 0.12), value: transitionProgress)
+    }
+}
+
+/// A single full-bleed backdrop image. The blur is baked into the cached bitmap
+/// by `BackdropImageCache`, so this is a plain scaled image with no filter,
+/// no offscreen pass, and nothing to re-render while paging.
+private struct BackdropLayer: View {
+    let url: URL?
+
+    @State private var image: UIImage?
+
+    init(url: URL?) {
+        self.url = url
+        // Resolve synchronously on a cache hit so a prewarmed backdrop is on
+        // screen from the first frame instead of fading up out of the black base.
+        _image = State(initialValue: url.flatMap { BackdropImageCache.cached(for: $0) })
     }
 
-    private func backdropImage(url: URL?) -> some View {
-        CachedAsyncImage(url: url) { phase in
-            switch phase {
-            case .success(let image):
-                image
-                    .resizable()
-                    .scaledToFill()
-            case .empty, .failure:
-                Color.black
+    var body: some View {
+        Color.clear
+            .overlay {
+                if let image {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
             }
-        }
-        .scaleEffect(1.18)
-        .blur(radius: 34, opaque: true)
-        .clipped()
+            .clipped()
+            .task(id: url) {
+                guard let url else {
+                    image = nil
+                    return
+                }
+                if let cached = BackdropImageCache.cached(for: url) {
+                    image = cached
+                    return
+                }
+                let loaded = await BackdropImageCache.backdrop(for: url)
+                if !Task.isCancelled { image = loaded }
+            }
     }
 }

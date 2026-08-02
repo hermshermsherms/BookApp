@@ -6,6 +6,9 @@ struct BookCardView: View {
     let book: Book
     let catalog: [Book]
     let isCurrent: Bool
+    /// Whether this card is close enough to the viewport to be worth drawing.
+    /// Off-screen cards keep their state but freeze their SceneKit renderer.
+    let isRendering: Bool
     let onSave: () -> Void
     let onBuy: () -> Void
     let onSkip: () -> Void
@@ -30,7 +33,8 @@ struct BookCardView: View {
                     imageURL: book.highQualityImageURL,
                     title: book.title,
                     author: book.authorDisplay,
-                    pageCount: book.pageCount
+                    pageCount: book.pageCount,
+                    isRendering: isRendering
                 )
                 .frame(
                     width: min(pageWidth - 18, 360),
@@ -408,6 +412,7 @@ private struct InteractiveBookCover: View {
     let title: String
     let author: String
     let pageCount: Int?
+    let isRendering: Bool
 
     @State private var image: UIImage?
     @State private var primaryColor = UIColor(red: 0.42, green: 0.28, blue: 0.18, alpha: 1)
@@ -420,7 +425,8 @@ private struct InteractiveBookCover: View {
                 primaryColor: primaryColor,
                 aspectRatio: aspectRatio,
                 pageCount: pageCount,
-                textureKey: imageURL?.absoluteString ?? title
+                textureKey: imageURL?.absoluteString ?? title,
+                isRendering: isRendering
             )
             // Keep a wide render surface even for narrow portrait covers. The
             // model preserves the source aspect ratio internally, while the
@@ -440,7 +446,7 @@ private struct InteractiveBookCover: View {
         }
 
         if let cached = ImageCache.shared.image(for: imageURL) {
-            apply(cached)
+            await apply(cached)
             return
         }
 
@@ -449,18 +455,24 @@ private struct InteractiveBookCover: View {
             guard let loaded = UIImage(data: data) else { return }
             let prepared = await loaded.byPreparingForDisplay() ?? loaded
             ImageCache.shared.insert(prepared, for: imageURL)
-            apply(prepared)
+            await apply(prepared)
         } catch {
             image = fallbackImage()
         }
     }
 
-    private func apply(_ loaded: UIImage) {
+    @MainActor
+    private func apply(_ loaded: UIImage) async {
         image = loaded
         if loaded.size.height > 0 {
             aspectRatio = loaded.size.width / loaded.size.height
         }
-        primaryColor = loaded.averageColor ?? primaryColor
+        // Sampling the cover's average colour renders through Core Image. Doing
+        // that inline on the main thread stalled a frame every time a cover
+        // finished loading, which is exactly when the feed is being swiped.
+        if let average = await CoverColor.average(of: loaded) {
+            primaryColor = average
+        }
     }
 
     private func fallbackImage() -> UIImage {
@@ -492,6 +504,7 @@ private struct BookSceneView: UIViewRepresentable {
     let aspectRatio: CGFloat
     let pageCount: Int?
     let textureKey: String
+    let isRendering: Bool
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -501,12 +514,19 @@ private struct BookSceneView: UIViewRepresentable {
         let view = SCNView()
         view.backgroundColor = .clear
         view.antialiasingMode = .multisampling4X
-        view.isPlaying = true
+        view.isPlaying = isRendering
         view.preferredFramesPerSecond = 60
         view.clipsToBounds = false
         view.layer.masksToBounds = false
         view.scene = context.coordinator.makeScene()
-        view.addGestureRecognizer(UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.didPan(_:))))
+
+        // The cover reacts to horizontal drags only. Without this the recogniser
+        // also claimed vertical drags, stealing them from the feed's paging
+        // gesture whenever a swipe started on the book itself.
+        let pan = UIPanGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.didPan(_:)))
+        pan.delegate = context.coordinator
+        view.addGestureRecognizer(pan)
+
         view.isAccessibilityElement = true
         view.accessibilityTraits = .image
         context.coordinator.sceneView = view
@@ -514,6 +534,13 @@ private struct BookSceneView: UIViewRepresentable {
     }
 
     func updateUIView(_ view: SCNView, context: Context) {
+        // Freezing the render loop on off-screen pages is the single biggest win
+        // here: an idle SCNView otherwise redraws the whole scene 60 times a
+        // second whether or not anything can see it.
+        if view.isPlaying != isRendering {
+            view.isPlaying = isRendering
+        }
+
         context.coordinator.updateBook(
             image: coverImage,
             primaryColor: primaryColor,
@@ -523,7 +550,7 @@ private struct BookSceneView: UIViewRepresentable {
         )
     }
 
-    final class Coordinator: NSObject {
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
         weak var sceneView: SCNView?
         private let floatingNode = SCNNode()
         private let bookNode = SCNNode()
@@ -722,20 +749,37 @@ private struct BookSceneView: UIViewRepresentable {
                 break
             }
         }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = gestureRecognizer as? UIPanGestureRecognizer, let view = sceneView else {
+                return true
+            }
+            let velocity = pan.velocity(in: view)
+            return abs(velocity.x) > abs(velocity.y)
+        }
     }
 }
 
-private extension UIImage {
-    var averageColor: UIColor? {
-        guard let ciImage = CIImage(image: self) else { return nil }
+/// Average cover colour, used to tint the 3D book's boards and spine.
+///
+/// The `CIContext` is shared: building one per cover (which is what happened
+/// before) costs milliseconds each time and was being paid on the main thread.
+private enum CoverColor {
+    private static let context = CIContext(options: [.workingColorSpace: NSNull()])
+
+    /// `nonisolated`, so awaiting this from the main actor moves the Core Image
+    /// render off the main thread.
+    static func average(of image: UIImage) async -> UIColor? {
+        guard let ciImage = CIImage(image: image) else { return nil }
         let extent = ciImage.extent
         let filter = CIFilter(name: "CIAreaAverage", parameters: [
             kCIInputImageKey: ciImage,
             kCIInputExtentKey: CIVector(cgRect: extent)
         ])
         guard let output = filter?.outputImage else { return nil }
+
         var bitmap = [UInt8](repeating: 0, count: 4)
-        CIContext(options: [.workingColorSpace: NSNull()]).render(
+        context.render(
             output,
             toBitmap: &bitmap,
             rowBytes: 4,

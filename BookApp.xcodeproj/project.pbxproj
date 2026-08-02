@@ -19,6 +19,7 @@
 		3F755BA92F3AD73400FDF4E4 /* PurchaseSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B962F3AD73400FDF4E4 /* PurchaseSheetView.swift */; };
 		3F755BAA2F3AD73400FDF4E4 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B8C2F3AD73400FDF4E4 /* AuthViewModel.swift */; };
 		3F755BAB2F3AD73400FDF4E4 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B8A2F3AD73400FDF4E4 /* Theme.swift */; };
+		AA0002012A0B4D5600000001 /* AppAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0002002A0B4D5600000001 /* AppAppearance.swift */; };
 		3F755BAC2F3AD73400FDF4E4 /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B9B2F3AD73400FDF4E4 /* ReviewView.swift */; };
 		3F755BAD2F3AD73400FDF4E4 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B852F3AD73400FDF4E4 /* AuthService.swift */; };
 		3F755BAE2F3AD73400FDF4E4 /* BookSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B992F3AD73400FDF4E4 /* BookSearchView.swift */; };
@@ -57,6 +58,7 @@
 		3F755B882F3AD73400FDF4E5 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		3F755B892F3AD73400FDF4E4 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		3F755B8A2F3AD73400FDF4E4 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		AA0002002A0B4D5600000001 /* AppAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAppearance.swift; sourceTree = "<group>"; };
 		3F755B8C2F3AD73400FDF4E4 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		3F755B8D2F3AD73400FDF4E4 /* DiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryViewModel.swift; sourceTree = "<group>"; };
 		3F755B8E2F3AD73400FDF4E4 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
@@ -127,6 +129,7 @@
 			children = (
 				3F755B892F3AD73400FDF4E4 /* Extensions.swift */,
 				3F755B8A2F3AD73400FDF4E4 /* Theme.swift */,
+				AA0002002A0B4D5600000001 /* AppAppearance.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -325,6 +328,7 @@
 				3F755BA92F3AD73400FDF4E4 /* PurchaseSheetView.swift in Sources */,
 				3F755BAA2F3AD73400FDF4E4 /* AuthViewModel.swift in Sources */,
 				3F755BAB2F3AD73400FDF4E4 /* Theme.swift in Sources */,
+				AA0002012A0B4D5600000001 /* AppAppearance.swift in Sources */,
 				3F755BAC2F3AD73400FDF4E4 /* ReviewView.swift in Sources */,
 				3F755BAD2F3AD73400FDF4E4 /* AuthService.swift in Sources */,
 				3F755BAE2F3AD73400FDF4E4 /* BookSearchView.swift in Sources */,

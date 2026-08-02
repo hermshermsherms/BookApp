@@ -1,3 +1,4 @@
+import CoreImage
 import SwiftUI
 import UIKit
 
@@ -29,6 +30,89 @@ private extension UIImage {
     var approximateCost: Int {
         guard let cg = cgImage else { return 1 }
         return cg.bytesPerRow * cg.height
+    }
+}
+
+/// Pre-blurred, heavily downscaled covers used as the full-screen feed backdrop.
+///
+/// The feed used to build its backdrop with `.blur(radius: 34)` applied live to a
+/// full-screen cover. That forces a full-screen offscreen GPU pass on *every*
+/// frame of a swipe — for two layers at once during a page transition — which
+/// both dropped frames and, when the render pass ran out of budget mid-swipe,
+/// left large black rectangles across the screen. Blurring once at load time,
+/// into a ~96pt image that the GPU simply scales up, removes the pass entirely.
+enum BackdropImageCache {
+    private static let cache: NSCache<NSURL, UIImage> = {
+        let cache = NSCache<NSURL, UIImage>()
+        cache.countLimit = 60
+        return cache
+    }()
+
+    private static let ciContext = CIContext(options: [.useSoftwareRenderer: false])
+
+    /// Synchronous cache lookup, so an already-prepared backdrop renders on the
+    /// very first frame instead of fading in from black.
+    static func cached(for url: URL) -> UIImage? {
+        cache.object(forKey: url as NSURL)
+    }
+
+    static func backdrop(for url: URL) async -> UIImage? {
+        if let hit = cached(for: url) { return hit }
+
+        guard let source = await sourceImage(for: url),
+              let prepared = blurred(source) else { return nil }
+        cache.setObject(prepared, forKey: url as NSURL)
+        return prepared
+    }
+
+    /// Warms the backdrops for the neighbouring pages so a swipe never has to
+    /// cross-fade into an empty layer.
+    static func prewarm(_ urls: [URL]) async {
+        for url in urls where cached(for: url) == nil {
+            _ = await backdrop(for: url)
+        }
+    }
+
+    private static func sourceImage(for url: URL) async -> UIImage? {
+        if let hit = ImageCache.shared.image(for: url) { return hit }
+
+        var request = URLRequest(url: url)
+        request.cachePolicy = .returnCacheDataElseLoad
+        guard let (data, _) = try? await URLSession.shared.data(for: request),
+              let raw = UIImage(data: data) else { return nil }
+        let prepared = await raw.byPreparingForDisplay() ?? raw
+        ImageCache.shared.insert(prepared, for: url)
+        return prepared
+    }
+
+    /// Downscale first, then blur. Gaussian blur cost scales with pixel count, so
+    /// running it on a 96pt-wide image is effectively free, and the upscale back
+    /// to screen size softens it further.
+    private static func blurred(_ image: UIImage) -> UIImage? {
+        let targetWidth: CGFloat = 96
+        guard image.size.width > 0, image.size.height > 0 else { return nil }
+
+        let ratio = image.size.height / image.size.width
+        let smallSize = CGSize(width: targetWidth, height: max(1, (targetWidth * ratio).rounded()))
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+        let downscaled = UIGraphicsImageRenderer(size: smallSize, format: format).image { _ in
+            image.draw(in: CGRect(origin: .zero, size: smallSize))
+        }
+
+        guard let input = CIImage(image: downscaled) else { return downscaled }
+        // Clamp before blurring, otherwise the kernel pulls in transparent pixels
+        // from outside the extent and the edges wash out to black.
+        guard let filter = CIFilter(
+            name: "CIGaussianBlur",
+            parameters: [kCIInputImageKey: input.clampedToExtent(), kCIInputRadiusKey: 9]
+        ), let output = filter.outputImage,
+           let rendered = ciContext.createCGImage(output, from: input.extent) else {
+            return downscaled
+        }
+        return UIImage(cgImage: rendered)
     }
 }
 
