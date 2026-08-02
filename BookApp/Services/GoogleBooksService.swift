@@ -7,7 +7,8 @@ final class GoogleBooksService {
     private let baseURL = "https://www.googleapis.com/books/v1/volumes"
 
     // Google removed keyless access (anonymous requests now return HTTP 429 with a
-    // 0/day quota), so an API key is required. Set it in Secrets.swift.
+    // 0/day quota), so an API key is required. Set GOOGLE_BOOKS_API_KEY in
+    // the app target's Info settings when you are ready to use live data.
     private let apiKey: String? = Config.GoogleBooks.apiKey
 
     private let session: URLSession
@@ -154,6 +155,129 @@ final class GoogleBooksService {
 
     /// Fetch detailed info for a single book by its Google Books ID
     func fetchBookDetails(id: String) async throws -> Book {
+        try await fetchBookItem(id: id).toBook()
+    }
+
+    /// Finds a provider-authorized reader. Google may expose a sample, purchased
+    /// edition, or public-domain book depending on region/account; Gutenberg is
+    /// used only for an exact public-domain title/author match.
+    func fetchReadingResource(for book: Book) async throws -> BookReadingResource {
+        if let direct = try? await fetchBookItem(id: book.id),
+           let resource = direct.readingResource(fallbackTitle: book.title) {
+            return resource
+        }
+
+        if let googleResource = try? await fetchGoogleEPUBEdition(for: book) {
+            return googleResource
+        }
+
+        if let gutenbergResource = try? await fetchGutenbergEPUBEdition(for: book) {
+            return gutenbergResource
+        }
+
+        throw GoogleBooksError.epubUnavailable
+    }
+
+    private func fetchGoogleEPUBEdition(for book: Book) async throws -> BookReadingResource {
+
+        guard var components = URLComponents(string: baseURL) else {
+            throw GoogleBooksError.invalidURL
+        }
+        components.queryItems = [
+            URLQueryItem(name: "q", value: "intitle:\(book.title) inauthor:\(book.primaryAuthor)"),
+            URLQueryItem(name: "maxResults", value: "10"),
+            URLQueryItem(name: "printType", value: "books")
+        ]
+        if let apiKey {
+            components.queryItems?.append(URLQueryItem(name: "key", value: apiKey))
+        }
+        guard let url = components.url else { throw GoogleBooksError.invalidURL }
+
+        let data = try await fetchWithRetry(url: url)
+        let response = try decoder.decode(GoogleBooksResponse.self, from: data)
+        let normalizedTitle = book.title.normalizedBookSearchText
+        let normalizedAuthor = book.primaryAuthor.normalizedBookSearchText
+
+        let candidates = response.items ?? []
+        let closest = candidates.first {
+            $0.volumeInfo.title.normalizedBookSearchText == normalizedTitle
+                && ($0.volumeInfo.authors ?? []).contains {
+                    $0.normalizedBookSearchText.contains(normalizedAuthor)
+                        || normalizedAuthor.contains($0.normalizedBookSearchText)
+                }
+        }
+
+        guard let resource = closest?.readingResource(fallbackTitle: book.title) else {
+            throw GoogleBooksError.epubUnavailable
+        }
+        return resource
+    }
+
+    /// Project Gutenberg is a public-domain fallback for books that Google does
+    /// not expose as EPUB. We verify the title and author on Gutenberg's own book
+    /// page, then retain its EPUB URL while presenting the corresponding full
+    /// HTML rendition in WebKit for reliable in-app reading.
+    private func fetchGutenbergEPUBEdition(for book: Book) async throws -> BookReadingResource {
+        guard var components = URLComponents(string: "https://www.gutenberg.org/ebooks/search/") else {
+            throw GoogleBooksError.invalidURL
+        }
+        components.queryItems = [
+            URLQueryItem(name: "query", value: "\(book.title) \(book.primaryAuthor)"),
+            URLQueryItem(name: "submit_search", value: "Go!")
+        ]
+        guard let url = components.url else { throw GoogleBooksError.invalidURL }
+
+        let data = try await fetchWithRetry(url: url)
+        guard let searchHTML = String(data: data, encoding: .utf8) else {
+            throw GoogleBooksError.invalidResponse
+        }
+
+        let candidateIDs = Array(searchHTML.regexCaptures(#"/ebooks/([0-9]+)"#).uniqued().prefix(8))
+        let expectedTitle = book.title.normalizedBookSearchText
+        let expectedAuthorTokens = book.primaryAuthor.normalizedBookSearchTokens
+
+        for candidateID in candidateIDs {
+            guard let detailURL = URL(string: "https://www.gutenberg.org/ebooks/\(candidateID)") else {
+                continue
+            }
+            let detailData = try await fetchWithRetry(url: detailURL)
+            guard let detailHTML = String(data: detailData, encoding: .utf8),
+                  let heading = detailHTML.firstRegexCapture(
+                    #"<h1[^>]*id="book_title"[^>]*>(.*?)</h1>"#
+                  )?.decodingCommonHTMLEntities,
+                  let byRange = heading.range(of: " by ", options: [.caseInsensitive, .backwards]) else {
+                continue
+            }
+
+            let candidateTitle = String(heading[..<byRange.lowerBound]).normalizedBookSearchText
+            let candidateAuthor = String(heading[byRange.upperBound...]).normalizedBookSearchTokens
+            guard candidateTitle == expectedTitle,
+                  expectedAuthorTokens.isSubset(of: candidateAuthor),
+                  let readerPath = detailHTML.firstRegexCapture(
+                    #"class="read-online-button"[^>]*href="([^"]+)""#
+                  ),
+                  let epubPath = detailHTML.firstRegexCapture(
+                    #"class="featured-format-link"[^>]*href="([^"]+\.epub[^"]*)""#
+                  ),
+                  let readerURL = URL(string: readerPath, relativeTo: detailURL)?.absoluteURL,
+                  let epubURL = URL(string: epubPath, relativeTo: detailURL)?.absoluteURL else {
+                continue
+            }
+
+            return BookReadingResource(
+                id: "gutenberg-\(candidateID)",
+                bookID: book.id,
+                title: String(heading[..<byRange.lowerBound]),
+                readerURL: readerURL,
+                epubDownloadURL: epubURL,
+                isPublicDomain: true
+            )
+        }
+
+        throw GoogleBooksError.epubUnavailable
+    }
+
+    private func fetchBookItem(id: String) async throws -> GoogleBookItem {
         var urlString = "\(baseURL)/\(id)"
         if let apiKey = apiKey {
             urlString += "?key=\(apiKey)"
@@ -169,8 +293,7 @@ final class GoogleBooksService {
             throw GoogleBooksError.invalidResponse
         }
 
-        let item = try decoder.decode(GoogleBookItem.self, from: data)
-        return item.toBook()
+        return try decoder.decode(GoogleBookItem.self, from: data)
     }
 
     // MARK: - Fetch Similar Books
@@ -185,8 +308,12 @@ final class GoogleBooksService {
         }
 
         let results = try await searchBooks(query: query, maxResults: maxResults + 1)
-        // Filter out the original book
-        return results.filter { $0.id != book.id }
+        // Filter out the exact volume and duplicate editions of the source title.
+        // Google frequently returns several scans/editions with different IDs.
+        let sourceTitle = book.title.normalizedBookSearchText
+        return results.filter {
+            $0.id != book.id && $0.title.normalizedBookSearchText != sourceTitle
+        }
     }
 }
 
@@ -198,6 +325,7 @@ enum GoogleBooksError: LocalizedError {
     case httpError(Int)
     case rateLimited
     case noResults
+    case epubUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -211,6 +339,71 @@ enum GoogleBooksError: LocalizedError {
             return "Too many requests. Please try again later."
         case .noResults:
             return "No books found."
+        case .epubUnavailable:
+            return "A readable preview is not available for this book."
         }
+    }
+}
+
+private extension GoogleBookItem {
+    func readingResource(fallbackTitle: String) -> BookReadingResource? {
+        guard let rawReaderURL = accessInfo?.webReaderLink,
+              let readerURL = URL(string: rawReaderURL.replacingOccurrences(of: "http://", with: "https://")) else {
+            return nil
+        }
+        let downloadURL = accessInfo?.epub?.downloadLink
+            .flatMap { URL(string: $0.replacingOccurrences(of: "http://", with: "https://")) }
+        return BookReadingResource(
+            id: id,
+            bookID: id,
+            title: volumeInfo.title.isEmpty ? fallbackTitle : volumeInfo.title,
+            readerURL: readerURL,
+            epubDownloadURL: downloadURL,
+            isPublicDomain: accessInfo?.publicDomain ?? false
+        )
+    }
+}
+
+private extension String {
+    var normalizedBookSearchText: String {
+        folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+    }
+
+    var normalizedBookSearchTokens: Set<String> {
+        Set(normalizedBookSearchText.split(separator: " ").map(String.init))
+    }
+
+    func regexCaptures(_ pattern: String) -> [String] {
+        guard let expression = try? NSRegularExpression(
+            pattern: pattern,
+            options: [.caseInsensitive, .dotMatchesLineSeparators]
+        ) else { return [] }
+        let fullRange = NSRange(startIndex..<endIndex, in: self)
+        return expression.matches(in: self, range: fullRange).compactMap { match in
+            guard match.numberOfRanges > 1,
+                  let range = Range(match.range(at: 1), in: self) else { return nil }
+            return String(self[range])
+        }
+    }
+
+    func firstRegexCapture(_ pattern: String) -> String? {
+        regexCaptures(pattern).first
+    }
+
+    var decodingCommonHTMLEntities: String {
+        replacingOccurrences(of: "&amp;", with: "&")
+            .replacingOccurrences(of: "&#39;", with: "'")
+            .replacingOccurrences(of: "&quot;", with: "\"")
+            .replacingOccurrences(of: "&nbsp;", with: " ")
+    }
+}
+
+private extension Sequence where Element: Hashable {
+    func uniqued() -> [Element] {
+        var seen = Set<Element>()
+        return filter { seen.insert($0).inserted }
     }
 }

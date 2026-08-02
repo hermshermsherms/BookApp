@@ -39,12 +39,20 @@ enum Config {
     /// Google Books API configuration
     enum GoogleBooks {
         /// Google Books API key, or `nil` if not configured.
-        /// Set it in `Secrets.swift` (copied from `Secrets.example.swift`).
-        /// Google removed keyless access, so a key is required for live book data.
+        /// Set `GOOGLE_BOOKS_API_KEY` in the app target's Info settings.
         static var apiKey: String? {
-            let key = Secrets.googleBooksAPIKey
-            guard !key.isEmpty, !key.hasPrefix("PASTE_YOUR") else { return nil }
-            return key
+            if let key = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_BOOKS_API_KEY") as? String,
+               isUsable(key) {
+                return key
+            }
+
+            let localKey = Secrets.googleBooksAPIKey
+            return isUsable(localKey) ? localKey : nil
+        }
+
+        private static func isUsable(_ key: String) -> Bool {
+            !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !key.hasPrefix("PASTE_YOUR")
         }
     }
 

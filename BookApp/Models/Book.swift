@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a book from the Google Books API
-struct Book: Identifiable, Codable, Equatable {
+struct Book: Identifiable, Codable, Equatable, Hashable {
     let id: String // Google Books volume ID
     let title: String
     let authors: [String]
@@ -13,6 +13,35 @@ struct Book: Identifiable, Codable, Equatable {
     let thumbnailURL: String?
     let largeCoverURL: String?
     let infoLink: String?
+    let epubURL: String?
+
+    init(
+        id: String,
+        title: String,
+        authors: [String],
+        description: String?,
+        categories: [String],
+        averageRating: Double?,
+        pageCount: Int?,
+        publishedDate: String?,
+        thumbnailURL: String?,
+        largeCoverURL: String?,
+        infoLink: String?,
+        epubURL: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.authors = authors
+        self.description = description
+        self.categories = categories
+        self.averageRating = averageRating
+        self.pageCount = pageCount
+        self.publishedDate = publishedDate
+        self.thumbnailURL = thumbnailURL
+        self.largeCoverURL = largeCoverURL
+        self.infoLink = infoLink
+        self.epubURL = epubURL
+    }
 
     var authorDisplay: String {
         authors.joined(separator: ", ")
@@ -118,6 +147,28 @@ struct GoogleBooksResponse: Codable {
 struct GoogleBookItem: Codable {
     let id: String
     let volumeInfo: VolumeInfo
+    let accessInfo: BookAccessInfo?
+}
+
+struct BookAccessInfo: Codable {
+    let publicDomain: Bool?
+    let webReaderLink: String?
+    let epub: BookDownloadAccess?
+}
+
+struct BookDownloadAccess: Codable {
+    let isAvailable: Bool?
+    let downloadLink: String?
+    let acsTokenLink: String?
+}
+
+struct BookReadingResource: Identifiable, Hashable {
+    let id: String
+    let bookID: String
+    let title: String
+    let readerURL: URL
+    let epubDownloadURL: URL?
+    let isPublicDomain: Bool
 }
 
 struct VolumeInfo: Codable {
@@ -168,7 +219,8 @@ extension GoogleBookItem {
             publishedDate: volumeInfo.publishedDate,
             thumbnailURL: volumeInfo.imageLinks?.thumbnailHTTPS,
             largeCoverURL: volumeInfo.imageLinks?.bestQualityHTTPS,
-            infoLink: volumeInfo.infoLink
+            infoLink: volumeInfo.infoLink,
+            epubURL: accessInfo?.epub?.downloadLink
         )
     }
 }

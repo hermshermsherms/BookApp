@@ -234,8 +234,8 @@ struct BookDetailView: View {
             }
             similarBooks = await rankedBySimilarity(candidates)
         } catch {
-            // Fallback to some mock similar books to maintain consistency
-            similarBooks = mockSimilarBooks()
+            // Do not invent placeholder recommendations when the service is unavailable.
+            similarBooks = []
         }
         isLoadingSimilar = false
     }
@@ -256,13 +256,4 @@ struct BookDetailView: View {
         return scored.sorted { $0.score > $1.score }.prefix(10).map { $0.book }
     }
     
-    private func mockSimilarBooks() -> [Book] {
-        let genre = book.genreDisplay.lowercased()
-        let mockBooks = [
-            Book(id: "similar1", title: "Recommended Reading", authors: ["Popular Author"], description: "A great book in the \(genre) genre", categories: [genre], averageRating: 4.2, pageCount: 300, publishedDate: "2023", thumbnailURL: nil, largeCoverURL: nil, infoLink: nil),
-            Book(id: "similar2", title: "Editor's Pick", authors: ["Bestselling Writer"], description: "Another excellent choice", categories: [genre], averageRating: 4.5, pageCount: 280, publishedDate: "2023", thumbnailURL: nil, largeCoverURL: nil, infoLink: nil),
-            Book(id: "similar3", title: "Reader's Choice", authors: ["Award Winner"], description: "Highly rated by readers", categories: [genre], averageRating: 4.3, pageCount: 320, publishedDate: "2023", thumbnailURL: nil, largeCoverURL: nil, infoLink: nil)
-        ]
-        return Array(mockBooks.prefix(3))
-    }
 }

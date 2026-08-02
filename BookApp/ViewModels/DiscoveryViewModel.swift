@@ -36,6 +36,12 @@ final class DiscoveryViewModel: ObservableObject {
     private let prefetchThreshold = 3
     private var isFetchingMore = false
 
+    init(seedBooks: [Book] = []) {
+        var seen = Set<String>()
+        books = seedBooks.filter { seen.insert($0.id).inserted }
+        currentIndex = 0
+    }
+
     // MARK: - Load Feed
 
     func loadFeed() async {
@@ -71,6 +77,11 @@ final class DiscoveryViewModel: ObservableObject {
         }
 
         isLoading = false
+    }
+
+    func loadFeedIfNeeded() async {
+        guard books.isEmpty else { return }
+        await loadFeed()
     }
 
     // MARK: - Fetch More Books

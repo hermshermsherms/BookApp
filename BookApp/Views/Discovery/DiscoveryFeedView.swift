@@ -1,208 +1,109 @@
 import SwiftUI
 
+private enum DiscoveryRoute: Hashable {
+    case similar(sourceTitle: String, selectedBook: Book, catalog: [Book])
+    case reader(book: Book, resource: BookReadingResource)
+}
+
 struct DiscoveryFeedView: View {
-    @StateObject private var viewModel = DiscoveryViewModel()
-    @State private var currentPage: Int = 0
+    @State private var path: [DiscoveryRoute] = []
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            DiscoveryPagerView(
+                onBrowseSimilar: pushSimilarFeed,
+                onReadEPUB: pushReader
+            )
+            .toolbar(.hidden, for: .navigationBar)
+            .navigationDestination(for: DiscoveryRoute.self) { route in
+                switch route {
+                case .similar(let sourceTitle, _, let catalog):
+                    DiscoveryPagerView(
+                        seedBooks: catalog,
+                        onBrowseSimilar: pushSimilarFeed,
+                        onReadEPUB: pushReader
+                    )
+                    .navigationTitle("")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar(.visible, for: .navigationBar)
+                    .toolbarBackground(.hidden, for: .navigationBar)
+                    .toolbarColorScheme(.dark, for: .navigationBar)
+                    .toolbar {
+                        ToolbarItem(placement: .principal) {
+                            Text("Similar to \(sourceTitle)")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.62)
+                                .shadow(color: .black.opacity(0.95), radius: 5, y: 2)
+                                .accessibilityAddTraits(.isHeader)
+                        }
+                    }
+
+                case .reader(let book, let resource):
+                    EPUBReaderView(book: book, resource: resource)
+                }
+            }
+        }
+    }
+
+    private func pushSimilarFeed(source: Book, selected: Book, catalog: [Book]) {
+        path.append(.similar(sourceTitle: source.title, selectedBook: selected, catalog: catalog))
+    }
+
+    private func pushReader(book: Book, resource: BookReadingResource) {
+        path.append(.reader(book: book, resource: resource))
+    }
+}
+
+private struct DiscoveryPagerView: View {
+    @StateObject private var viewModel: DiscoveryViewModel
+    @State private var currentPage = 0
     @State private var dragOffset: CGFloat = 0
-    @State private var horizontalDrag: CGFloat = 0
-    @State private var swipeAxis: Axis? = nil
     @State private var isDragging = false
 
-    // Constants for better maintainability
-    private static let swipeThreshold: CGFloat = 80
-    private static let screenWidth = UIScreen.main.bounds.width
-    private static let screenHeight = UIScreen.main.bounds.height
+    let onBrowseSimilar: (Book, Book, [Book]) -> Void
+    let onReadEPUB: (Book, BookReadingResource) -> Void
 
-    /// De-duplicated books for the ForEach — a last line of defense against
-    /// duplicate IDs, which make SwiftUI render a blank screen.
+    private static let swipeThreshold: CGFloat = 80
+
+    init(
+        seedBooks: [Book] = [],
+        onBrowseSimilar: @escaping (Book, Book, [Book]) -> Void,
+        onReadEPUB: @escaping (Book, BookReadingResource) -> Void
+    ) {
+        _viewModel = StateObject(wrappedValue: DiscoveryViewModel(seedBooks: seedBooks))
+        self.onBrowseSimilar = onBrowseSimilar
+        self.onReadEPUB = onReadEPUB
+    }
+
     private var feedBooks: [Book] {
         var seen = Set<String>()
         return viewModel.books.filter { seen.insert($0.id).inserted }
     }
 
-    /// currentPage clamped into range, so a card is always visible.
     private var clampedPage: Int {
         guard !feedBooks.isEmpty else { return 0 }
         return min(max(currentPage, 0), feedBooks.count - 1)
     }
 
     var body: some View {
-        ZStack {
-            Theme.background
-                .ignoresSafeArea(.all)
+        GeometryReader { geometry in
+            ZStack {
+                Color.black.ignoresSafeArea()
 
-            if viewModel.isLoading {
-                VStack(spacing: 16) {
-                    ProgressView()
-                        .tint(Theme.accent)
-                        .scaleEffect(1.5)
-                    Text("Finding books for you...")
-                        .font(Theme.body())
-                        .foregroundColor(.white.opacity(0.7))
+                if viewModel.isLoading {
+                    loadingView
+                } else if !feedBooks.isEmpty {
+                    feed(in: geometry.size)
+                } else if let error = viewModel.error {
+                    errorView(error)
+                } else {
+                    emptyView
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black)
-            } else if !viewModel.books.isEmpty {
-                // Instagram Reels-style fluid swipe container
-                ZStack {
-                    ForEach(Array(feedBooks.enumerated()), id: \.element.id) { index, book in
-                        BookCardView(book: book)
-                            .frame(width: Self.screenWidth, height: Self.screenHeight)
-                            .background(Theme.background)
-                            .clipped()
-                            .offset(y: calculateOffset(for: index))
-                            .offset(x: calculateXOffset(for: index))
-                            .rotationEffect(.degrees(calculateRotation(for: index)))
-                            .opacity(calculateOpacity(for: index))
-                            .scaleEffect(calculateScale(for: index))
-                            .onTapGesture(count: 2) {
-                                viewModel.likeCurrent()
-                            }
-                            .onTapGesture {
-                                viewModel.singleTap()
-                            }
-                            .onLongPressGesture(minimumDuration: 0.5) {
-                                viewModel.buyBook()
-                            }
-                    }
-                }
-                .gesture(
-                    DragGesture()
-                        .onChanged { value in
-                            let w = value.translation.width
-                            let h = value.translation.height
-                            // Lock to one axis once the gesture clearly favors a direction,
-                            // so horizontal like/dislike and vertical paging never conflict.
-                            if swipeAxis == nil, hypot(w, h) > 12 {
-                                swipeAxis = abs(w) > abs(h) ? .horizontal : .vertical
-                            }
-                            switch swipeAxis {
-                            case .horizontal:
-                                horizontalDrag = w
-                            case .vertical:
-                                isDragging = true
-                                dragOffset = h
-                            case .none:
-                                break
-                            }
-                        }
-                        .onEnded { value in
-                            if swipeAxis == .horizontal {
-                                handleHorizontalEnd(width: value.translation.width)
-                            } else {
-                                handleVerticalEnd(height: value.translation.height)
-                            }
-                            swipeAxis = nil
-                        }
-                )
-                .ignoresSafeArea(.all)
-                .onAppear {
-                    currentPage = viewModel.currentIndex
-                }
-                .onChange(of: viewModel.currentIndex) { newIndex in
-                    if newIndex != currentPage {
-                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                            currentPage = newIndex
-                        }
-                    }
-                }
-                
-                // Pre-load next book image into the shared cache (hidden)
-                if let nextBook = viewModel.nextBook,
-                   let imageURL = nextBook.highQualityImageURL {
-                    CachedAsyncImage(url: imageURL) { _ in
-                        EmptyView()
-                    }
-                    .frame(width: 0, height: 0)
-                    .opacity(0)
-                }
-
-                // Live like/dislike indicator that fades in while swiping horizontally
-                if swipeAxis == .horizontal, horizontalDrag != 0 {
-                    Image(systemName: horizontalDrag > 0 ? "heart.fill" : "xmark")
-                        .font(.system(size: 96, weight: .bold))
-                        .foregroundColor(horizontalDrag > 0 ? Theme.positive : Theme.negative)
-                        .opacity(min(1.0, abs(horizontalDrag) / Self.swipeThreshold))
-                        .zIndex(11)
-                }
-
-                // Like animation overlay
-                if viewModel.likeAnimationTrigger {
-                    Image(systemName: "heart.fill")
-                        .font(.system(size: 80))
-                        .foregroundColor(Theme.positive)
-                        .shadow(color: .black.opacity(0.3), radius: 8)
-                        .transition(.scale.combined(with: .opacity))
-                        .zIndex(10)
-                }
-
-                // Dislike animation overlay
-                if viewModel.dislikeAnimationTrigger {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 80, weight: .bold))
-                        .foregroundColor(Theme.negative)
-                        .shadow(color: .black.opacity(0.3), radius: 8)
-                        .transition(.scale.combined(with: .opacity))
-                        .zIndex(10)
-                }
-
-            } else if let error = viewModel.error {
-                VStack(spacing: 16) {
-                    Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 40))
-                        .foregroundColor(.white.opacity(0.6))
-                    Text(error)
-                        .font(Theme.body())
-                        .foregroundColor(.white.opacity(0.8))
-                        .multilineTextAlignment(.center)
-                    Button("Try Again") {
-                        Task { await viewModel.loadFeed() }
-                    }
-                    .primaryButtonStyle()
-                }
-                .padding()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black)
-            } else {
-                VStack(spacing: 16) {
-                    Image(systemName: "books.vertical")
-                        .font(.system(size: 40))
-                        .foregroundColor(.white.opacity(0.6))
-                    Text("No more books right now")
-                        .font(Theme.serifTitle(20))
-                        .foregroundColor(.white)
-                    Text("Check back later for new recommendations")
-                        .font(Theme.body(14))
-                        .foregroundColor(.white.opacity(0.7))
-                    Button("Refresh") {
-                        Task { await viewModel.loadFeed() }
-                    }
-                    .primaryButtonStyle()
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.black)
             }
         }
-        .sheet(isPresented: $viewModel.showDetailView) {
-            if let book = viewModel.currentBook {
-                BookDetailView(book: book, onLike: {
-                    viewModel.likeCurrent()
-                    viewModel.showDetailView = false
-                }, onBuy: {
-                    // Close detail view and open purchase sheet
-                    viewModel.showDetailView = false
-                    Task {
-                        try? await Task.sleep(nanoseconds: UInt64(0.1 * 1_000_000_000))
-                        await MainActor.run {
-                            viewModel.showPurchaseSheet = true
-                        }
-                    }
-                }, onDislike: {
-                    // Close detail view - no action needed
-                    viewModel.showDetailView = false
-                })
-            }
-        }
+        .ignoresSafeArea()
         .sheet(isPresented: $viewModel.showPurchaseSheet) {
             if let book = viewModel.currentBook {
                 PurchaseSheetView(book: book) {
@@ -213,114 +114,236 @@ struct DiscoveryFeedView: View {
             }
         }
         .task {
-            await viewModel.loadFeed()
+            await viewModel.loadFeedIfNeeded()
+            currentPage = viewModel.currentIndex
         }
     }
 
-    // MARK: - Gesture End Handlers
+    private func feed(in size: CGSize) -> some View {
+        let pageWidth = UIScreen.main.bounds.width
 
-    private func handleVerticalEnd(height verticalMovement: CGFloat) {
-        var targetPage = currentPage
+        return ZStack {
+            CoverBackdropView(
+                currentURL: feedBooks[clampedPage].highQualityImageURL,
+                transitionURL: transitionBook?.highQualityImageURL,
+                transitionProgress: min(abs(dragOffset) / max(size.height * 0.72, 1), 1)
+            )
+            .frame(width: pageWidth, height: size.height)
+            .clipped()
 
-        if verticalMovement < -Self.swipeThreshold && currentPage < feedBooks.count - 1 {
-            targetPage = currentPage + 1   // swipe up → next
-        } else if verticalMovement > Self.swipeThreshold && currentPage > 0 {
-            targetPage = currentPage - 1   // swipe down → previous
+            ForEach(Array(feedBooks.enumerated()), id: \.element.id) { index, book in
+                BookCardView(
+                    book: book,
+                    catalog: feedBooks,
+                    isCurrent: index == clampedPage,
+                    onSave: { viewModel.likeCurrent() },
+                    onBuy: { viewModel.buyBook() },
+                    onSkip: { advanceBySkipping() },
+                    onBrowseSimilar: { selected, catalog in
+                        onBrowseSimilar(book, selected, catalog)
+                    },
+                    onReadEPUB: { resource in
+                        onReadEPUB(book, resource)
+                    }
+                )
+                .frame(width: pageWidth, height: size.height)
+                .clipped()
+                .offset(y: calculateOffset(for: index, pageHeight: size.height))
+                .opacity(calculateOpacity(for: index))
+            }
+
+            feedbackOverlay
+        }
+        .frame(width: pageWidth, height: size.height)
+        .clipped()
+        .contentShape(Rectangle())
+        .gesture(pagingGesture)
+        .onChange(of: viewModel.currentIndex) { newIndex in
+            guard newIndex != currentPage else { return }
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
+                currentPage = newIndex
+            }
+        }
+    }
+
+    private var transitionBook: Book? {
+        guard isDragging else { return nil }
+        if dragOffset < 0, clampedPage < feedBooks.count - 1 {
+            return feedBooks[clampedPage + 1]
+        }
+        if dragOffset > 0, clampedPage > 0 {
+            return feedBooks[clampedPage - 1]
+        }
+        return nil
+    }
+
+    private var pagingGesture: some Gesture {
+        DragGesture(minimumDistance: 16)
+            .onChanged { value in
+                let height = value.translation.height
+                if abs(height) > abs(value.translation.width) {
+                    isDragging = true
+                    dragOffset = height
+                }
+            }
+            .onEnded { value in
+                if abs(value.translation.height) > abs(value.translation.width) {
+                    handleVerticalEnd(height: value.translation.height)
+                } else {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
+                        dragOffset = 0
+                    }
+                    isDragging = false
+                }
+            }
+    }
+
+    private func handleVerticalEnd(height: CGFloat) {
+        var target = currentPage
+        if height < -Self.swipeThreshold, currentPage < feedBooks.count - 1 {
+            target += 1
+        } else if height > Self.swipeThreshold, currentPage > 0 {
+            target -= 1
         }
 
-        if targetPage != currentPage {
-            let movingForward = targetPage > currentPage
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
-                currentPage = targetPage
+        if target != currentPage {
+            let movingForward = target > currentPage
+            withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
+                currentPage = target
                 dragOffset = 0
             }
-            // Swiping up past a book (without judging) is a mild skip signal.
-            if movingForward {
-                viewModel.skipCurrent()
-            }
-            viewModel.updateCurrentIndex(targetPage)
+            if movingForward { viewModel.skipCurrent() }
+            viewModel.updateCurrentIndex(target)
         } else {
             withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
                 dragOffset = 0
             }
         }
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            isDragging = false
-        }
+        isDragging = false
     }
 
-    private func handleHorizontalEnd(width: CGFloat) {
-        guard abs(width) > Self.swipeThreshold else {
-            // Not far enough — snap back to center.
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.9)) {
-                horizontalDrag = 0
-            }
-            return
+    private func advanceBySkipping() {
+        guard currentPage < feedBooks.count - 1 else { return }
+        let target = currentPage + 1
+        viewModel.skipCurrent()
+        withAnimation(.spring(response: 0.42, dampingFraction: 0.84)) {
+            currentPage = target
         }
-        // Register the judgment (shows the heart/X overlay + advances the feed),
-        // and return the card to center as the next book slides up.
-        withAnimation(.spring(response: 0.3, dampingFraction: 0.85)) {
-            horizontalDrag = 0
-        }
-        if width > 0 {
-            viewModel.swipeLike()
-        } else {
-            viewModel.swipeDislike()
-        }
+        viewModel.updateCurrentIndex(target)
     }
 
-    // MARK: - Helper Methods for Fluid Swipe Animation
-
-    /// Horizontal follow-the-finger offset, applied only to the current card.
-    private func calculateXOffset(for index: Int) -> CGFloat {
-        guard swipeAxis == .horizontal, index == currentPage else { return 0 }
-        return horizontalDrag
-    }
-
-    /// Subtle Tinder-style tilt while dragging the current card sideways.
-    private func calculateRotation(for index: Int) -> Double {
-        guard swipeAxis == .horizontal, index == currentPage else { return 0 }
-        return Double(horizontalDrag / 20)
-    }
-
-    private func calculateOffset(for index: Int) -> CGFloat {
-        let page = clampedPage
-        let currentOffset = CGFloat(index - page) * Self.screenHeight
-
-        if isDragging {
-            // During drag, apply the drag offset only to the current and adjacent cards
-            if index == page {
-                return currentOffset + dragOffset
-            } else if index == page + 1 || index == page - 1 {
-                return currentOffset + dragOffset
-            }
-        }
-
-        return currentOffset
+    private func calculateOffset(for index: Int, pageHeight: CGFloat) -> CGFloat {
+        let currentOffset = CGFloat(index - clampedPage) * pageHeight
+        guard isDragging, abs(index - clampedPage) <= 1 else { return currentOffset }
+        return currentOffset + dragOffset
     }
 
     private func calculateOpacity(for index: Int) -> Double {
-        let distance = abs(index - clampedPage)
-        
-        if distance > 2 {
-            return 0.0
-        } else if distance > 1 {
-            return 0.3
-        }
-        
-        return 1.0
+        abs(index - clampedPage) > 1 ? 0 : 1
     }
-    
-    private func calculateScale(for index: Int) -> CGFloat {
-        let distance = abs(index - clampedPage)
-        
-        if distance > 2 {
-            return 0.8
-        } else if distance > 1 {
-            return 0.9
+
+    @ViewBuilder
+    private var feedbackOverlay: some View {
+        if viewModel.likeAnimationTrigger {
+            Image(systemName: "heart.fill")
+                .font(.system(size: 72))
+                .foregroundColor(Theme.positive)
+                .shadow(color: .black.opacity(0.2), radius: 8)
+                .transition(.scale.combined(with: .opacity))
+                .allowsHitTesting(false)
+                .zIndex(12)
+        } else if viewModel.dislikeAnimationTrigger {
+            Image(systemName: "xmark")
+                .font(.system(size: 76, weight: .bold))
+                .foregroundColor(Theme.negative)
+                .shadow(color: .black.opacity(0.2), radius: 8)
+                .allowsHitTesting(false)
+                .zIndex(12)
         }
-        
-        return 1.0
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: 16) {
+            ProgressView().tint(Theme.accent).scaleEffect(1.4)
+            Text("Finding books for you…")
+                .font(Theme.body())
+                .foregroundColor(Theme.secondaryText)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func errorView(_ error: String) -> some View {
+        VStack(spacing: 16) {
+            Image(systemName: "exclamationmark.triangle")
+                .font(.system(size: 40))
+                .foregroundColor(Theme.muted)
+            Text(error)
+                .font(Theme.body())
+                .foregroundColor(Theme.secondaryText)
+                .multilineTextAlignment(.center)
+            Button("Try Again") { Task { await viewModel.loadFeed() } }
+                .primaryButtonStyle()
+        }
+        .padding()
+    }
+
+    private var emptyView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "books.vertical")
+                .font(.system(size: 40))
+                .foregroundColor(Theme.muted)
+            Text("No more books right now")
+                .font(Theme.serifTitle(20))
+                .foregroundColor(Theme.primaryText)
+            Button("Refresh") { Task { await viewModel.loadFeed() } }
+                .primaryButtonStyle()
+        }
+    }
+}
+
+private struct CoverBackdropView: View {
+    let currentURL: URL?
+    let transitionURL: URL?
+    let transitionProgress: CGFloat
+
+    var body: some View {
+        ZStack {
+            backdropImage(url: currentURL)
+                .opacity(1 - transitionProgress)
+
+            if let transitionURL {
+                backdropImage(url: transitionURL)
+                    .opacity(transitionProgress)
+            }
+
+            LinearGradient(
+                colors: [
+                    Color.black.opacity(0.58),
+                    Color.black.opacity(0.42),
+                    Color.black.opacity(0.68)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        }
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
+        .animation(.linear(duration: 0.12), value: transitionProgress)
+    }
+
+    private func backdropImage(url: URL?) -> some View {
+        CachedAsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFill()
+            case .empty, .failure:
+                Color.black
+            }
+        }
+        .scaleEffect(1.18)
+        .blur(radius: 34, opaque: true)
+        .clipped()
     }
 }
