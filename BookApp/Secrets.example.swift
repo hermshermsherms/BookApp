@@ -18,4 +18,13 @@ enum Secrets {
     /// Create one at https://console.cloud.google.com/apis/credentials
     /// (create/select a project → enable the "Books API" → create an API key).
     static let googleBooksAPIKey = "PASTE_YOUR_GOOGLE_BOOKS_API_KEY_HERE"
+
+    /// Anthropic API key, used by the Reading Buddy tab.
+    /// Create one at https://console.anthropic.com/settings/keys
+    ///
+    /// ⚠️ Development only. Anything compiled into the app can be extracted from
+    /// the binary by anyone who downloads it, so this is fine on your own device
+    /// but must not ship. For release, proxy the call through a server you
+    /// control and keep the key there.
+    static let anthropicAPIKey = "PASTE_YOUR_ANTHROPIC_API_KEY_HERE"
 }

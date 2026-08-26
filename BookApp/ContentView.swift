@@ -53,11 +53,17 @@ struct MainTabView: View {
                 }
                 .tag(1)
 
+            BuddyView()
+                .tabItem {
+                    Label("Buddy", systemImage: "bubble.left.and.bubble.right.fill")
+                }
+                .tag(2)
+
             ProfileView(authViewModel: authViewModel)
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
                 }
-                .tag(2)
+                .tag(3)
         }
         .tint(Theme.accent)
     }
