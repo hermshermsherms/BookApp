@@ -1,46 +1,46 @@
 import SwiftUI
 
-/// Tab root for the reading buddy: your ongoing conversations, plus a way to
-/// start a new one about a book or an author.
+/// Tab root for the reading buddy.
+///
+/// Search sits at the top rather than behind a "new conversation" button: the
+/// main thing you come here to do is start talking about something. One field
+/// covers both titles and authors — the results are split into an Authors
+/// section and a Books section, ordered by whichever the query looks like.
 struct BuddyView: View {
     @StateObject private var store = ConversationStore.shared
-    @State private var isPickingSubject = false
-    /// Resolved in the picker's callback rather than in the destination builder:
+    @StateObject private var library = LibraryStore.shared
+
+    @State private var query = ""
+    @State private var results: [Book] = []
+    @State private var isSearching = false
+    @State private var searchFailed = false
+    @State private var searchTask: Task<Void, Never>?
+    /// Resolved when a subject is tapped rather than in the destination builder:
     /// `store.conversation(for:)` inserts and saves, and doing that while SwiftUI
     /// is evaluating a body mutates published state mid-update.
     @State private var openedConversation: Conversation?
+
+    private var isSearchConfigured: Bool { Config.GoogleBooks.apiKey != nil }
+    private var trimmedQuery: String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Theme.background.ignoresSafeArea()
 
-                if store.conversations.isEmpty {
-                    emptyState
-                } else {
-                    conversationList
+                VStack(spacing: 0) {
+                    searchField
+
+                    if trimmedQuery.isEmpty {
+                        browseList
+                    } else {
+                        resultsList
+                    }
                 }
             }
             .navigationTitle("Reading Buddy")
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        isPickingSubject = true
-                    } label: {
-                        Image(systemName: "square.and.pencil")
-                    }
-                    .tint(Theme.accent)
-                    .accessibilityLabel("Start a new conversation")
-                }
-            }
-            .sheet(isPresented: $isPickingSubject) {
-                SubjectPickerView { subject in
-                    isPickingSubject = false
-                    openedConversation = store.conversation(for: subject)
-                }
-            }
-            // `navigationDestination(item:)` is iOS 17; this target is 16, so the
-            // freshly picked conversation is pushed via an isPresented binding.
             .navigationDestination(
                 isPresented: Binding(
                     get: { openedConversation != nil },
@@ -54,67 +54,297 @@ struct BuddyView: View {
         }
     }
 
-    private var conversationList: some View {
-        List {
-            ForEach(store.conversations) { conversation in
-                NavigationLink {
-                    ChatView(conversation: conversation)
+    // MARK: - Search field
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(Theme.muted)
+
+            TextField("Search a book or author", text: $query)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.words)
+                .submitLabel(.search)
+                .onChange(of: query) { _ in scheduleSearch() }
+
+            if isSearching {
+                ProgressView().controlSize(.small)
+            } else if !query.isEmpty {
+                Button {
+                    query = ""
+                    results = []
+                    searchFailed = false
                 } label: {
-                    row(for: conversation)
+                    Image(systemName: "xmark.circle.fill").foregroundColor(Theme.muted)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(11)
+        .background(Theme.cardBackground)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusMedium))
+        .padding(.horizontal, 16)
+        .padding(.bottom, 10)
+    }
+
+    // MARK: - Empty query: conversations + library
+
+    @ViewBuilder
+    private var browseList: some View {
+        if store.conversations.isEmpty && libraryBooks.isEmpty {
+            Spacer()
+            emptyState
+            Spacer()
+        } else {
+            List {
+                if !store.conversations.isEmpty {
+                    Section("Your conversations") {
+                        ForEach(store.conversations) { conversation in
+                            Button {
+                                openedConversation = conversation
+                            } label: {
+                                subjectRow(
+                                    subject: conversation.subject,
+                                    detail: conversation.lastLine
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .onDelete { offsets in
+                            offsets.map { store.conversations[$0] }.forEach(store.delete)
+                        }
+                    }
+                    .listRowBackground(Theme.cardBackground)
+                }
+
+                if !libraryBooks.isEmpty {
+                    Section("From your library") {
+                        ForEach(libraryBooks) { book in
+                            Button { open(.book(book)) } label: {
+                                subjectRow(
+                                    subject: .book(book),
+                                    detail: book.authorDisplay
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .listRowBackground(Theme.cardBackground)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+        }
+    }
+
+    // MARK: - Results
+
+    @ViewBuilder
+    private var resultsList: some View {
+        List {
+            if !isSearchConfigured {
+                Section {
+                    notice(
+                        "Search needs a Google Books API key",
+                        detail: "Set googleBooksAPIKey in Secrets.swift to look up books and authors. Conversations you've already started still work."
+                    )
+                }
+                .listRowBackground(Theme.cardBackground)
+            } else if searchFailed {
+                Section {
+                    notice("Couldn't reach Google Books", detail: "Check your connection and try again.")
                 }
                 .listRowBackground(Theme.cardBackground)
             }
-            .onDelete { offsets in
-                offsets.map { store.conversations[$0] }.forEach(store.delete)
+
+            // An author-looking query puts people first; a title query puts books
+            // first. Both sections are always present when they have content.
+            if queryLooksLikeAuthor {
+                authorSection
+                bookSection
+            } else {
+                bookSection
+                authorSection
+            }
+
+            if isSearchConfigured, !isSearching, !searchFailed,
+               results.isEmpty, trimmedQuery.count >= 2 {
+                Section {
+                    notice("No matches for \"\(trimmedQuery)\"", detail: nil)
+                }
+                .listRowBackground(Theme.cardBackground)
             }
         }
         .listStyle(.insetGrouped)
         .scrollContentBackground(.hidden)
     }
 
-    private func row(for conversation: Conversation) -> some View {
+    @ViewBuilder
+    private var bookSection: some View {
+        if !results.isEmpty {
+            Section("Books") {
+                ForEach(results) { book in
+                    Button { open(.book(book)) } label: {
+                        subjectRow(subject: .book(book), detail: book.authorDisplay)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .listRowBackground(Theme.cardBackground)
+        }
+    }
+
+    @ViewBuilder
+    private var authorSection: some View {
+        let authors = discoveredAuthors
+        if !authors.isEmpty {
+            Section("Authors") {
+                ForEach(authors, id: \.self) { author in
+                    Button { open(.author(author)) } label: {
+                        subjectRow(subject: .author(author), detail: "Talk about their work")
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .listRowBackground(Theme.cardBackground)
+        }
+    }
+
+    // MARK: - Rows
+
+    private func subjectRow(subject: ChatSubject, detail: String) -> some View {
         HStack(spacing: 12) {
-            SubjectThumbnail(subject: conversation.subject, size: CGSize(width: 40, height: 58))
+            SubjectThumbnail(
+                subject: subject,
+                size: subject.kind == .author
+                    ? CGSize(width: 38, height: 38)
+                    : CGSize(width: 38, height: 55)
+            )
 
             VStack(alignment: .leading, spacing: 3) {
-                Text(conversation.subject.name)
-                    .font(Theme.serifBold(16))
+                Text(subject.name)
+                    .font(Theme.body(15).weight(.semibold))
                     .foregroundColor(Theme.primaryText)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
 
-                Text(conversation.lastLine)
+                Text(detail)
                     .font(Theme.caption(13))
                     .foregroundColor(Theme.secondaryText)
-                    .lineLimit(2)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+        .padding(.vertical, 3)
+    }
+
+    private func notice(_ title: String, detail: String?) -> some View {
+        VStack(alignment: .leading, spacing: 5) {
+            Text(title)
+                .font(Theme.body(14).weight(.semibold))
+                .foregroundColor(Theme.primaryText)
+            if let detail {
+                Text(detail)
+                    .font(Theme.caption(13))
+                    .foregroundColor(Theme.secondaryText)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 3)
     }
 
     private var emptyState: some View {
-        VStack(spacing: 16) {
+        VStack(spacing: 14) {
             Image(systemName: "bubble.left.and.bubble.right")
-                .font(.system(size: 44))
+                .font(.system(size: 42))
                 .foregroundColor(Theme.muted)
 
             Text("Talk about what you're reading")
                 .font(Theme.serifTitle(21))
                 .foregroundColor(Theme.primaryText)
 
-            Text("Pick a book or an author and ask anything — themes, a passage that stuck with you, where to go next.")
+            Text("Search for a book or an author above, then ask anything — themes, a passage that stuck with you, where to go next.")
                 .font(Theme.body(15))
                 .foregroundColor(Theme.secondaryText)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 36)
+        }
+    }
 
-            Button("Start a conversation") { isPickingSubject = true }
-                .primaryButtonStyle()
-                .padding(.top, 4)
+    // MARK: - Data
+
+    private var libraryBooks: [Book] {
+        library.entries.compactMap(\.book)
+    }
+
+    /// Google Books has no author entity, so authors are derived from the
+    /// volumes that came back — searching a title surfaces its author too,
+    /// which is what makes one field cover both.
+    private var discoveredAuthors: [String] {
+        var seen = Set<String>()
+        return results.map(\.primaryAuthor).filter { name in
+            !name.isEmpty
+                && name != "Unknown Author"
+                && seen.insert(name.lowercased()).inserted
+        }
+        .prefix(6)
+        .map { $0 }
+    }
+
+    /// True when the query reads like a person's name rather than a title —
+    /// i.e. it matches one of the authors that came back.
+    private var queryLooksLikeAuthor: Bool {
+        let text = trimmedQuery.lowercased()
+        guard text.count >= 3 else { return false }
+        return discoveredAuthors.contains { $0.lowercased().contains(text) }
+    }
+
+    // MARK: - Actions
+
+    private func open(_ subject: ChatSubject) {
+        openedConversation = store.conversation(for: subject)
+    }
+
+    private func scheduleSearch() {
+        searchTask?.cancel()
+        let text = trimmedQuery
+        guard text.count >= 2 else {
+            results = []
+            isSearching = false
+            searchFailed = false
+            return
+        }
+
+        searchTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
+
+            isSearching = true
+            searchFailed = false
+            defer { isSearching = false }
+
+            do {
+                // Feed filters off: someone looking up the book in their hand
+                // shouldn't be blocked by a missing cover or a short blurb.
+                let found = try await GoogleBooksService.shared.searchBooks(
+                    query: text,
+                    maxResults: 20,
+                    applyFeedFilters: false
+                )
+                guard !Task.isCancelled else { return }
+
+                var seen = Set<String>()
+                results = found.filter { seen.insert($0.id).inserted }
+            } catch {
+                guard !Task.isCancelled else { return }
+                results = []
+                searchFailed = true
+            }
         }
     }
 }
 
-/// Small cover/initial badge used in lists.
+/// Small cover/initial badge used in lists and the chat header.
 struct SubjectThumbnail: View {
     let subject: ChatSubject
     var size: CGSize = CGSize(width: 40, height: 58)
@@ -122,11 +352,11 @@ struct SubjectThumbnail: View {
     var body: some View {
         Group {
             if subject.kind == .author {
-                RoundedRectangle(cornerRadius: 6)
+                Circle()
                     .fill(Theme.parchment)
                     .overlay {
                         Text(subject.name.prefix(1).uppercased())
-                            .font(Theme.serifBold(18))
+                            .font(Theme.serifBold(17))
                             .foregroundColor(Theme.accent)
                     }
             } else {
@@ -138,220 +368,9 @@ struct SubjectThumbnail: View {
                         RoundedRectangle(cornerRadius: 6).fill(Theme.parchment)
                     }
                 }
+                .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
         .frame(width: size.width, height: size.height)
-        .clipShape(RoundedRectangle(cornerRadius: 6))
-    }
-}
-
-// MARK: - Subject picker
-
-/// Choose what the next conversation is about: a book from your library, a book
-/// found by search, or an author.
-struct SubjectPickerView: View {
-    enum Mode: String, CaseIterable {
-        case books = "Books"
-        case authors = "Authors"
-    }
-
-    let onPick: (ChatSubject) -> Void
-
-    @Environment(\.dismiss) private var dismiss
-    @StateObject private var library = LibraryStore.shared
-
-    @State private var mode: Mode = .books
-    @State private var query = ""
-    @State private var results: [Book] = []
-    @State private var isSearching = false
-    @State private var searchTask: Task<Void, Never>?
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Theme.background.ignoresSafeArea()
-
-                VStack(spacing: 0) {
-                    Picker("Mode", selection: $mode) {
-                        ForEach(Mode.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.horizontal)
-                    .padding(.bottom, 8)
-
-                    searchField
-
-                    List {
-                        if mode == .books {
-                            bookSections
-                        } else {
-                            authorSection
-                        }
-                    }
-                    .listStyle(.insetGrouped)
-                    .scrollContentBackground(.hidden)
-                }
-            }
-            .navigationTitle("New conversation")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }.tint(Theme.accent)
-                }
-            }
-        }
-    }
-
-    private var searchField: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(Theme.muted)
-            TextField(
-                mode == .books ? "Search by title or author" : "Search for an author",
-                text: $query
-            )
-            .autocorrectionDisabled()
-            .onChange(of: query) { _ in scheduleSearch() }
-
-            if isSearching {
-                ProgressView().controlSize(.small)
-            } else if !query.isEmpty {
-                Button {
-                    query = ""
-                    results = []
-                } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundColor(Theme.muted)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .padding(10)
-        .background(Theme.cardBackground)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadiusMedium))
-        .padding(.horizontal)
-        .padding(.bottom, 8)
-    }
-
-    @ViewBuilder
-    private var bookSections: some View {
-        if !libraryBooks.isEmpty && query.isEmpty {
-            Section("In your library") {
-                ForEach(libraryBooks) { book in
-                    Button { onPick(.book(book)) } label: { bookRow(book) }
-                        .buttonStyle(.plain)
-                }
-            }
-            .listRowBackground(Theme.cardBackground)
-        }
-
-        if !results.isEmpty {
-            Section(query.isEmpty ? "Results" : "Search results") {
-                ForEach(results) { book in
-                    Button { onPick(.book(book)) } label: { bookRow(book) }
-                        .buttonStyle(.plain)
-                }
-            }
-            .listRowBackground(Theme.cardBackground)
-        }
-    }
-
-    @ViewBuilder
-    private var authorSection: some View {
-        let authors = discoveredAuthors
-        if authors.isEmpty {
-            Section {
-                Text(query.isEmpty
-                     ? "Search for an author, or save some books to your library first."
-                     : "No authors found.")
-                    .font(Theme.body(14))
-                    .foregroundColor(Theme.secondaryText)
-            }
-            .listRowBackground(Theme.cardBackground)
-        } else {
-            Section("Authors") {
-                ForEach(authors, id: \.self) { author in
-                    Button {
-                        onPick(.author(author))
-                    } label: {
-                        HStack(spacing: 12) {
-                            SubjectThumbnail(
-                                subject: .author(author),
-                                size: CGSize(width: 34, height: 34)
-                            )
-                            Text(author)
-                                .font(Theme.body(16))
-                                .foregroundColor(Theme.primaryText)
-                            Spacer()
-                        }
-                        .padding(.vertical, 2)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .listRowBackground(Theme.cardBackground)
-        }
-    }
-
-    private func bookRow(_ book: Book) -> some View {
-        HStack(spacing: 12) {
-            SubjectThumbnail(subject: .book(book), size: CGSize(width: 36, height: 52))
-            VStack(alignment: .leading, spacing: 2) {
-                Text(book.title)
-                    .font(Theme.body(15).weight(.semibold))
-                    .foregroundColor(Theme.primaryText)
-                    .lineLimit(2)
-                Text(book.authorDisplay)
-                    .font(Theme.caption(13))
-                    .foregroundColor(Theme.secondaryText)
-                    .lineLimit(1)
-            }
-            Spacer()
-        }
-        .contentShape(Rectangle())
-        .padding(.vertical, 2)
-    }
-
-    // MARK: - Data
-
-    private var libraryBooks: [Book] {
-        library.entries.compactMap(\.book)
-    }
-
-    /// Authors are derived from search results plus your library, de-duplicated
-    /// case-insensitively — Google Books has no author-entity endpoint.
-    private var discoveredAuthors: [String] {
-        let pool = (results + libraryBooks).map(\.primaryAuthor)
-        var seen = Set<String>()
-        return pool.filter { name in
-            let key = name.lowercased()
-            guard !name.isEmpty, name != "Unknown Author", seen.insert(key).inserted else {
-                return false
-            }
-            return query.isEmpty || name.localizedCaseInsensitiveContains(query)
-        }
-    }
-
-    private func scheduleSearch() {
-        searchTask?.cancel()
-        let text = query.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard text.count >= 2 else {
-            results = []
-            isSearching = false
-            return
-        }
-
-        searchTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            guard !Task.isCancelled else { return }
-
-            isSearching = true
-            defer { isSearching = false }
-
-            let found = (try? await GoogleBooksService.shared.searchBooks(query: text)) ?? []
-            guard !Task.isCancelled else { return }
-
-            var seen = Set<String>()
-            results = found.filter { seen.insert($0.id).inserted }
-        }
     }
 }

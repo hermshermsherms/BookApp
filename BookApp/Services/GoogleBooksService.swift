@@ -52,8 +52,19 @@ final class GoogleBooksService {
 
     // MARK: - Search Books
 
-    /// Search books by title, author, or general query
-    func searchBooks(query: String, startIndex: Int = 0, maxResults: Int = 20, orderBy: String = "relevance") async throws -> [Book] {
+    /// Search books by title, author, or general query.
+    ///
+    /// `applyFeedFilters` controls the Discovery feed's quality screen (needs a
+    /// cover, a real description, no public-domain reprints). That screen is
+    /// right for a swipe feed but wrong when someone is looking up a specific
+    /// book they already have, so the Reading Buddy picker turns it off.
+    func searchBooks(
+        query: String,
+        startIndex: Int = 0,
+        maxResults: Int = 20,
+        orderBy: String = "relevance",
+        applyFeedFilters: Bool = true
+    ) async throws -> [Book] {
         guard var components = URLComponents(string: baseURL) else {
             throw GoogleBooksError.invalidURL
         }
@@ -91,6 +102,9 @@ final class GoogleBooksService {
             // actual language to keep translated/foreign editions out of the feed.
             guard item.volumeInfo.language == "en" else { return nil }
             let book = item.toBook()
+
+            guard applyFeedFilters else { return book }
+
             guard book.thumbnailURL != nil, let description = book.description else { return nil }
 
             // Skip auto-generated public-domain reprints (e.g. "Forgotten Books"),
