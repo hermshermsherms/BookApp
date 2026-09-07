@@ -5,7 +5,11 @@ import Foundation
 /// Kept separate from the transport so the personality and the spoiler rules
 /// are easy to find and tune without touching `ClaudeService`.
 enum BuddyPrompt {
-    static func system(for conversation: Conversation) -> String {
+    /// - Parameter spoken: true when the reply will be heard rather than read.
+    ///   Voice replies get their own length and formatting rules on top of the
+    ///   usual ones — a paragraph that scans fine in a bubble is a monologue out
+    ///   loud, and there is no scrollback to re-read.
+    static func system(for conversation: Conversation, spoken: Bool = false) -> String {
         var lines: [String] = []
 
         lines.append("""
@@ -49,6 +53,22 @@ enum BuddyPrompt {
         that's what they asked for. Plain prose: no headers, no bullet lists, no \
         bold — this is being read in a chat bubble and may also be read aloud.
         """)
+
+        if spoken {
+            lines.append("""
+            YOU ARE IN A SPOKEN CONVERSATION: the reader is talking to you out \
+            loud and hearing your answers read back. Keep every reply to two or \
+            three sentences unless they ask you to go deeper — they can always \
+            ask for more, and a long answer can't be skimmed. Say one thing well \
+            rather than three things briefly. Talk the way you would out loud: \
+            contractions, no lists, no headings, no titles in quotation marks. \
+            End with a question only when you actually want an answer, and never \
+            more than one. Their words reach you through speech recognition, so \
+            expect mangled names and misheard titles — work out what they meant \
+            from the book you're discussing instead of repeating back something \
+            that obviously isn't a word.
+            """)
+        }
 
         return lines.joined(separator: "\n\n")
     }

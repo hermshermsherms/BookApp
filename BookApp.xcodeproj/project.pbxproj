@@ -27,6 +27,8 @@
 		AA0032152A0B4D5600000001 /* BuddyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031152A0B4D5600000001 /* BuddyViewModel.swift */; };
 		AA0032162A0B4D5600000001 /* BuddyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031162A0B4D5600000001 /* BuddyView.swift */; };
 		AA0032172A0B4D5600000001 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031172A0B4D5600000001 /* ChatView.swift */; };
+		AA0032192A0B4D5600000001 /* VoiceModeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031192A0B4D5600000001 /* VoiceModeView.swift */; };
+		AA0032182A0B4D5600000001 /* VoiceConversationViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031182A0B4D5600000001 /* VoiceConversationViewModel.swift */; };
 		AA0002012A0B4D5600000001 /* AppAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0002002A0B4D5600000001 /* AppAppearance.swift */; };
 		3F755BAC2F3AD73400FDF4E4 /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B9B2F3AD73400FDF4E4 /* ReviewView.swift */; };
 		3F755BAD2F3AD73400FDF4E4 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B852F3AD73400FDF4E4 /* AuthService.swift */; };
@@ -74,6 +76,8 @@
 		AA0031152A0B4D5600000001 /* BuddyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyViewModel.swift; sourceTree = "<group>"; };
 		AA0031162A0B4D5600000001 /* BuddyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyView.swift; sourceTree = "<group>"; };
 		AA0031172A0B4D5600000001 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		AA0031192A0B4D5600000001 /* VoiceModeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceModeView.swift; sourceTree = "<group>"; };
+		AA0031182A0B4D5600000001 /* VoiceConversationViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceConversationViewModel.swift; sourceTree = "<group>"; };
 		AA0002002A0B4D5600000001 /* AppAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAppearance.swift; sourceTree = "<group>"; };
 		3F755B8C2F3AD73400FDF4E4 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		3F755B8D2F3AD73400FDF4E4 /* DiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryViewModel.swift; sourceTree = "<group>"; };
@@ -160,6 +164,7 @@
 			children = (
 				3F755B8C2F3AD73400FDF4E4 /* AuthViewModel.swift */,
 				AA0031152A0B4D5600000001 /* BuddyViewModel.swift */,
+				AA0031182A0B4D5600000001 /* VoiceConversationViewModel.swift */,
 				3F755B8D2F3AD73400FDF4E4 /* DiscoveryViewModel.swift */,
 				3F755B8E2F3AD73400FDF4E4 /* LibraryViewModel.swift */,
 				3F755B8F2F3AD73400FDF4E4 /* ProfileViewModel.swift */,
@@ -211,6 +216,7 @@
 			children = (
 				AA0031162A0B4D5600000001 /* BuddyView.swift */,
 				AA0031172A0B4D5600000001 /* ChatView.swift */,
+				AA0031192A0B4D5600000001 /* VoiceModeView.swift */,
 			);
 			path = Buddy;
 			sourceTree = "<group>";
@@ -368,6 +374,8 @@
 				AA0032152A0B4D5600000001 /* BuddyViewModel.swift in Sources */,
 				AA0032162A0B4D5600000001 /* BuddyView.swift in Sources */,
 				AA0032172A0B4D5600000001 /* ChatView.swift in Sources */,
+				AA0032192A0B4D5600000001 /* VoiceModeView.swift in Sources */,
+				AA0032182A0B4D5600000001 /* VoiceConversationViewModel.swift in Sources */,
 				AA0002012A0B4D5600000001 /* AppAppearance.swift in Sources */,
 				3F755BAC2F3AD73400FDF4E4 /* ReviewView.swift in Sources */,
 				3F755BAD2F3AD73400FDF4E4 /* AuthService.swift in Sources */,

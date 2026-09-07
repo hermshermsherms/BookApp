@@ -6,6 +6,7 @@ struct ChatView: View {
 
     @State private var isEditingProgress = false
     @State private var progressDraft = ""
+    @State private var isInVoiceMode = false
 
     init(conversation: Conversation) {
         _viewModel = StateObject(wrappedValue: BuddyViewModel(conversation: conversation))
@@ -36,11 +37,19 @@ struct ChatView: View {
             Text("The buddy keeps spoilers behind wherever you are.")
         }
         .onChange(of: voice.transcript) { newValue in
-            // Live dictation feeds the composer so it can still be edited.
-            if voice.isListening { viewModel.draft = newValue }
+            // Live dictation feeds the composer so it can still be edited. In
+            // voice mode the same controller is listening, but that transcript
+            // belongs to the call, not to the composer.
+            if voice.isListening, !isInVoiceMode { viewModel.draft = newValue }
+        }
+        .fullScreenCover(isPresented: $isInVoiceMode) {
+            // Same view model and same audio controller, so the spoken turns land
+            // in this transcript and only one thing ever owns the microphone.
+            VoiceModeView(buddy: viewModel, voice: voice)
         }
         .onChange(of: viewModel.lastCompletedReply) { reply in
-            guard let reply, voice.speakRepliesAloud else { return }
+            // Voice mode does its own speaking, sentence by sentence.
+            guard let reply, voice.speakRepliesAloud, !isInVoiceMode else { return }
             voice.speak(reply)
             viewModel.lastCompletedReply = nil
         }
@@ -233,6 +242,18 @@ struct ChatView: View {
 
     @ToolbarContentBuilder
     private var toolbarContent: some ToolbarContent {
+        ToolbarItem(placement: .navigationBarTrailing) {
+            Button {
+                voice.stopListening()
+                voice.stopSpeaking()
+                isInVoiceMode = true
+            } label: {
+                Image(systemName: "waveform.circle.fill")
+            }
+            .tint(Theme.accent)
+            .accessibilityLabel("Start a voice conversation")
+        }
+
         ToolbarItem(placement: .navigationBarTrailing) {
             Button {
                 voice.speakRepliesAloud.toggle()

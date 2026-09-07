@@ -9,6 +9,17 @@ final class BuddyViewModel: ObservableObject {
     /// Set once a reply finishes streaming, so the view can read it aloud.
     /// Cleared as soon as it's consumed.
     @Published var lastCompletedReply: String?
+    /// True while the hands-free conversation is driving this view model. It
+    /// changes the system prompt — spoken replies need to be shorter than read
+    /// ones — and tells the text chat not to speak over the call.
+    @Published var isVoiceMode = false
+
+    /// Set by voice mode: every chunk of the reply as it streams, so it can be
+    /// spoken sentence by sentence instead of after the whole reply lands.
+    var onReplyChunk: ((String) -> Void)?
+    /// Set by voice mode: the reply is complete. Carries the full text, or nil
+    /// if the turn produced nothing (cancelled or failed).
+    var onReplyEnded: ((String?) -> Void)?
 
     private let store = ConversationStore.shared
     private var streamTask: Task<Void, Never>?
@@ -61,7 +72,7 @@ final class BuddyViewModel: ObservableObject {
         store.update(conversation)
 
         isStreaming = true
-        let system = BuddyPrompt.system(for: conversation)
+        let system = BuddyPrompt.system(for: conversation, spoken: isVoiceMode)
         // The placeholder isn't part of the request — only real turns are sent.
         let history = Array(conversation.messages.dropLast())
 
@@ -92,19 +103,25 @@ final class BuddyViewModel: ObservableObject {
     private func append(_ chunk: String, to id: UUID) {
         guard let index = conversation.messages.firstIndex(where: { $0.id == id }) else { return }
         conversation.messages[index].text += chunk
+        onReplyChunk?(chunk)
     }
 
     private func finish(_ id: UUID) {
         isStreaming = false
         streamTask = nil
 
-        guard let index = conversation.messages.firstIndex(where: { $0.id == id }) else { return }
+        guard let index = conversation.messages.firstIndex(where: { $0.id == id }) else {
+            onReplyEnded?(nil)
+            return
+        }
         let reply = conversation.messages[index].text
         if reply.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             // Nothing came back — don't leave an empty bubble behind.
             conversation.messages.remove(at: index)
+            onReplyEnded?(nil)
         } else {
             lastCompletedReply = reply
+            onReplyEnded?(reply)
         }
         store.update(conversation)
     }
@@ -118,6 +135,7 @@ final class BuddyViewModel: ObservableObject {
             conversation.messages.remove(at: index)
         }
         errorMessage = error.localizedDescription
+        onReplyEnded?(nil)
         store.update(conversation)
     }
 }
