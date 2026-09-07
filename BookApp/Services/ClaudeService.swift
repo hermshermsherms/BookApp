@@ -44,12 +44,13 @@ actor ClaudeService {
     /// an incremental chunk of text to append, not the full message.
     func streamReply(
         system: String,
-        history: [ChatMessage]
+        history: [ChatMessage],
+        effort: String = "medium"
     ) -> AsyncThrowingStream<String, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
-                    try await self.stream(system: system, history: history) { chunk in
+                    try await self.stream(system: system, history: history, effort: effort) { chunk in
                         continuation.yield(chunk)
                     }
                     continuation.finish()
@@ -63,6 +64,7 @@ actor ClaudeService {
     private func stream(
         system: String,
         history: [ChatMessage],
+        effort: String,
         onChunk: @Sendable (String) -> Void
     ) async throws {
         guard let apiKey = Config.Anthropic.apiKey else {
@@ -85,9 +87,9 @@ actor ClaudeService {
             "messages": history.map { ["role": $0.role.rawValue, "content": $0.text] },
             // Adaptive thinking is on by default for this model; `medium` effort
             // keeps replies conversational and quick rather than essay-length.
-            // Raise to "high" if you want deeper literary analysis per turn.
+            // The study tools pass "high" — they earn the extra thinking.
             "thinking": ["type": "adaptive"],
-            "output_config": ["effort": "medium"],
+            "output_config": ["effort": effort],
             "fallbacks": "default"
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -128,6 +130,69 @@ actor ClaudeService {
         }
     }
 
+    // MARK: - Structured output
+
+    /// One-shot request that comes back as JSON matching `schema`.
+    ///
+    /// Used by the study tools (recap, characters, timeline, discussion), where
+    /// the reply is rendered as cards rather than as chat. `output_config.format`
+    /// makes the API constrain generation to the schema, so the first text block
+    /// is always valid JSON — no fence-stripping or brace-hunting needed. This
+    /// one isn't streamed: nothing is shown until the whole structure has landed.
+    func generateJSON(
+        system: String,
+        prompt: String,
+        schemaJSON: String,
+        effort: String = "high"
+    ) async throws -> Data {
+        guard let apiKey = Config.Anthropic.apiKey else {
+            throw ClaudeError.missingAPIKey
+        }
+
+        guard let schemaData = schemaJSON.data(using: .utf8),
+              let schema = try? JSONSerialization.jsonObject(with: schemaData) as? [String: Any] else {
+            throw ClaudeError.transport("Malformed output schema.")
+        }
+
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "content-type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        request.setValue(apiVersion, forHTTPHeaderField: "anthropic-version")
+        request.setValue(fallbackBeta, forHTTPHeaderField: "anthropic-beta")
+        request.timeoutInterval = 180
+
+        let body: [String: Any] = [
+            "model": model,
+            "max_tokens": 16000,
+            "system": system,
+            "messages": [["role": "user", "content": prompt]],
+            "thinking": ["type": "adaptive"],
+            "output_config": [
+                "effort": effort,
+                "format": ["type": "json_schema", "schema": schema]
+            ],
+            "fallbacks": "default"
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        if let http = response as? HTTPURLResponse, http.statusCode != 200 {
+            throw ClaudeError.http(status: http.statusCode, message: Self.errorMessage(from: data))
+        }
+
+        let message = try JSONDecoder().decode(MessageResponse.self, from: data)
+        if message.stopReason == "refusal" {
+            throw ClaudeError.refused(message.stopDetails?.category ?? "")
+        }
+        guard let text = message.content.first(where: { $0.type == "text" })?.text,
+              let json = text.data(using: .utf8) else {
+            throw ClaudeError.transport("The model returned nothing to show.")
+        }
+        return json
+    }
+
     private static func errorMessage(from data: Data) -> String {
         guard let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let error = object["error"] as? [String: Any],
@@ -138,6 +203,27 @@ actor ClaudeService {
     }
 
     // MARK: - Wire types
+
+    private struct StopDetails: Decodable {
+        let category: String?
+    }
+
+    private struct MessageResponse: Decodable {
+        let content: [Block]
+        let stopReason: String?
+        let stopDetails: StopDetails?
+
+        enum CodingKeys: String, CodingKey {
+            case content
+            case stopReason = "stop_reason"
+            case stopDetails = "stop_details"
+        }
+
+        struct Block: Decodable {
+            let type: String
+            let text: String?
+        }
+    }
 
     private struct StreamEvent: Decodable {
         let type: String
@@ -155,10 +241,6 @@ actor ClaudeService {
                 case stopReason = "stop_reason"
                 case stopDetails = "stop_details"
             }
-        }
-
-        struct StopDetails: Decodable {
-            let category: String?
         }
 
         struct APIError: Decodable {

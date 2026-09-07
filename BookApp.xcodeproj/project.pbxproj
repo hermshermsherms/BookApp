@@ -22,6 +22,9 @@
 		AA0032102A0B4D5600000001 /* ReadingBuddy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031102A0B4D5600000001 /* ReadingBuddy.swift */; };
 		AA0032112A0B4D5600000001 /* ClaudeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031112A0B4D5600000001 /* ClaudeService.swift */; };
 		AA0032122A0B4D5600000001 /* ConversationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031122A0B4D5600000001 /* ConversationStore.swift */; };
+		AA0032202A0B4D5600000001 /* BuddyStudy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031202A0B4D5600000001 /* BuddyStudy.swift */; };
+		AA0032212A0B4D5600000001 /* BuddyStudyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031212A0B4D5600000001 /* BuddyStudyService.swift */; };
+		AA0032222A0B4D5600000001 /* StudyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031222A0B4D5600000001 /* StudyView.swift */; };
 		AA0032132A0B4D5600000001 /* BuddyPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031132A0B4D5600000001 /* BuddyPrompt.swift */; };
 		AA0032142A0B4D5600000001 /* VoiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031142A0B4D5600000001 /* VoiceController.swift */; };
 		AA0032152A0B4D5600000001 /* BuddyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031152A0B4D5600000001 /* BuddyViewModel.swift */; };
@@ -69,6 +72,9 @@
 		AA0031102A0B4D5600000001 /* ReadingBuddy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingBuddy.swift; sourceTree = "<group>"; };
 		AA0031112A0B4D5600000001 /* ClaudeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeService.swift; sourceTree = "<group>"; };
 		AA0031122A0B4D5600000001 /* ConversationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationStore.swift; sourceTree = "<group>"; };
+		AA0031202A0B4D5600000001 /* BuddyStudy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyStudy.swift; sourceTree = "<group>"; };
+		AA0031212A0B4D5600000001 /* BuddyStudyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyStudyService.swift; sourceTree = "<group>"; };
+		AA0031222A0B4D5600000001 /* StudyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudyView.swift; sourceTree = "<group>"; };
 		AA0031132A0B4D5600000001 /* BuddyPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyPrompt.swift; sourceTree = "<group>"; };
 		AA0031142A0B4D5600000001 /* VoiceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceController.swift; sourceTree = "<group>"; };
 		AA0031152A0B4D5600000001 /* BuddyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyViewModel.swift; sourceTree = "<group>"; };
@@ -119,6 +125,7 @@
 			children = (
 				3F755B802F3AD73400FDF4E4 /* Book.swift */,
 				AA0031102A0B4D5600000001 /* ReadingBuddy.swift */,
+				AA0031202A0B4D5600000001 /* BuddyStudy.swift */,
 				3F755B812F3AD73400FDF4E4 /* Review.swift */,
 				3F755B822F3AD73400FDF4E4 /* SwipeAction.swift */,
 				3F755B832F3AD73400FDF4E4 /* UserBook.swift */,
@@ -140,6 +147,7 @@
 				AA0031112A0B4D5600000001 /* ClaudeService.swift */,
 				AA0031122A0B4D5600000001 /* ConversationStore.swift */,
 				AA0031132A0B4D5600000001 /* BuddyPrompt.swift */,
+				AA0031212A0B4D5600000001 /* BuddyStudyService.swift */,
 				AA0031142A0B4D5600000001 /* VoiceController.swift */,
 			);
 			path = Services;
@@ -211,6 +219,7 @@
 			children = (
 				AA0031162A0B4D5600000001 /* BuddyView.swift */,
 				AA0031172A0B4D5600000001 /* ChatView.swift */,
+				AA0031222A0B4D5600000001 /* StudyView.swift */,
 			);
 			path = Buddy;
 			sourceTree = "<group>";
@@ -364,6 +373,9 @@
 				AA0032112A0B4D5600000001 /* ClaudeService.swift in Sources */,
 				AA0032122A0B4D5600000001 /* ConversationStore.swift in Sources */,
 				AA0032132A0B4D5600000001 /* BuddyPrompt.swift in Sources */,
+				AA0032202A0B4D5600000001 /* BuddyStudy.swift in Sources */,
+				AA0032212A0B4D5600000001 /* BuddyStudyService.swift in Sources */,
+				AA0032222A0B4D5600000001 /* StudyView.swift in Sources */,
 				AA0032142A0B4D5600000001 /* VoiceController.swift in Sources */,
 				AA0032152A0B4D5600000001 /* BuddyViewModel.swift in Sources */,
 				AA0032162A0B4D5600000001 /* BuddyView.swift in Sources */,

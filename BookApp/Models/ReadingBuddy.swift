@@ -93,19 +93,37 @@ struct Conversation: Identifiable, Codable, Hashable {
     /// spoilers behind wherever the reader actually is. `nil` means unset, and
     /// the buddy will avoid late-book material until asked.
     var progressNote: String?
+    /// Recaps, character cards, timeline and discussion starters generated for
+    /// this conversation. Persisted so reopening a book doesn't re-bill a model
+    /// call for work that hasn't gone stale.
+    var study: StudyCache
 
     init(
         id: UUID = UUID(),
         subject: ChatSubject,
         messages: [ChatMessage] = [],
         updatedAt: Date = Date(),
-        progressNote: String? = nil
+        progressNote: String? = nil,
+        study: StudyCache = StudyCache()
     ) {
         self.id = id
         self.subject = subject
         self.messages = messages
         self.updatedAt = updatedAt
         self.progressNote = progressNote
+        self.study = study
+    }
+
+    /// Conversations saved before the study tools existed have no `study` key;
+    /// decode it as an empty cache rather than failing the whole file.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        subject = try container.decode(ChatSubject.self, forKey: .subject)
+        messages = try container.decode([ChatMessage].self, forKey: .messages)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        progressNote = try container.decodeIfPresent(String.self, forKey: .progressNote)
+        study = try container.decodeIfPresent(StudyCache.self, forKey: .study) ?? StudyCache()
     }
 
     /// Preview line for the conversation list.

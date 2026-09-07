@@ -16,8 +16,23 @@ struct ChatView: View {
             Theme.background.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                transcriptList
-                composer
+                header
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+
+                tabPicker
+
+                // The three panes share the header above, so switching tabs
+                // keeps the book and the reader's position in view.
+                switch viewModel.tab {
+                case .chat:
+                    transcriptList
+                    composer
+                case .understand:
+                    UnderstandPane(viewModel: viewModel)
+                case .discuss:
+                    DiscussPane(viewModel: viewModel)
+                }
             }
         }
         .navigationTitle(viewModel.subject.name)
@@ -29,11 +44,11 @@ struct ChatView: View {
             Text(viewModel.errorMessage ?? "")
         }
         .alert("Where are you in it?", isPresented: $isEditingProgress) {
-            TextField("e.g. halfway, or chapter 12", text: $progressDraft)
+            TextField("e.g. chapter 12, or the storm at sea", text: $progressDraft)
             Button("Save") { viewModel.setProgress(progressDraft) }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("The buddy keeps spoilers behind wherever you are.")
+            Text("A chapter or part number, or the last thing you remember happening — either works. Everything here stops where you say.")
         }
         .onChange(of: voice.transcript) { newValue in
             // Live dictation feeds the composer so it can still be edited.
@@ -47,7 +62,7 @@ struct ChatView: View {
         .onDisappear {
             voice.stopListening()
             voice.stopSpeaking()
-            viewModel.cancel()
+            viewModel.cancelAll()
         }
     }
 
@@ -57,8 +72,6 @@ struct ChatView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 12) {
-                    header
-
                     if viewModel.messages.isEmpty {
                         openers
                     }
@@ -128,7 +141,18 @@ struct ChatView: View {
             }
             Spacer()
         }
-        .padding(.bottom, 6)
+    }
+
+    private var tabPicker: some View {
+        Picker("View", selection: $viewModel.tab) {
+            ForEach(viewModel.availableTabs) { tab in
+                Text(tab.title).tag(tab)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 10)
     }
 
     private var openers: some View {
