@@ -42,20 +42,23 @@ struct LibraryView: View {
                                         userBook: userBook,
                                         onStatusChange: { newStatus in
                                             Task { await viewModel.updateStatus(userBook: userBook, newStatus: newStatus) }
+                                            // Finishing a book is the moment to
+                                            // capture the reaction, so go straight
+                                            // to the rating sheet.
+                                            if newStatus == .read {
+                                                promptReview(for: userBook)
+                                            }
                                         },
                                         onDelete: {
                                             Task { await viewModel.deleteBook(userBook) }
+                                        },
+                                        onReview: {
+                                            showReview = userBook
                                         }
                                     )
                                     .onTapGesture {
                                         // Tap opens the detail sheet (read more / buy).
                                         detailBook = userBook.book
-                                    }
-                                    .onLongPressGesture {
-                                        // Long-press a finished book to write/edit a review.
-                                        if userBook.status == .read {
-                                            showReview = userBook
-                                        }
                                     }
                                 }
                             }
@@ -113,6 +116,15 @@ struct LibraryView: View {
     }
 
     // MARK: - Helpers
+
+    /// Opens the rating sheet for a freshly finished book, unless it's already
+    /// been rated. Deferred a beat so the confirmation dialog can dismiss first.
+    private func promptReview(for userBook: UserBook) {
+        guard ReviewStore.shared.review(forGoogleBooksId: userBook.googleBooksId) == nil else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            showReview = userBook
+        }
+    }
 
     private func booksForTab(_ status: BookStatus) -> [UserBook] {
         switch status {

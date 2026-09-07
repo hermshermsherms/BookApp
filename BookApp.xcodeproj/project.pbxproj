@@ -27,6 +27,9 @@
 		AA0032152A0B4D5600000001 /* BuddyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031152A0B4D5600000001 /* BuddyViewModel.swift */; };
 		AA0032162A0B4D5600000001 /* BuddyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031162A0B4D5600000001 /* BuddyView.swift */; };
 		AA0032172A0B4D5600000001 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031172A0B4D5600000001 /* ChatView.swift */; };
+		AA0032202A0B4D5600000001 /* ReviewStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031202A0B4D5600000001 /* ReviewStore.swift */; };
+		AA0032212A0B4D5600000001 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031212A0B4D5600000001 /* StarRatingView.swift */; };
+		AA0032222A0B4D5600000001 /* ShelfBookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031222A0B4D5600000001 /* ShelfBookView.swift */; };
 		AA0002012A0B4D5600000001 /* AppAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0002002A0B4D5600000001 /* AppAppearance.swift */; };
 		3F755BAC2F3AD73400FDF4E4 /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B9B2F3AD73400FDF4E4 /* ReviewView.swift */; };
 		3F755BAD2F3AD73400FDF4E4 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B852F3AD73400FDF4E4 /* AuthService.swift */; };
@@ -67,6 +70,9 @@
 		3F755B892F3AD73400FDF4E4 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		3F755B8A2F3AD73400FDF4E4 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		AA0031102A0B4D5600000001 /* ReadingBuddy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingBuddy.swift; sourceTree = "<group>"; };
+		AA0031202A0B4D5600000001 /* ReviewStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewStore.swift; sourceTree = "<group>"; };
+		AA0031212A0B4D5600000001 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
+		AA0031222A0B4D5600000001 /* ShelfBookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShelfBookView.swift; sourceTree = "<group>"; };
 		AA0031112A0B4D5600000001 /* ClaudeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeService.swift; sourceTree = "<group>"; };
 		AA0031122A0B4D5600000001 /* ConversationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationStore.swift; sourceTree = "<group>"; };
 		AA0031132A0B4D5600000001 /* BuddyPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyPrompt.swift; sourceTree = "<group>"; };
@@ -136,6 +142,7 @@
 				3F755BC42F3AD73400FDF4E7 /* RecommendationEngine.swift */,
 				3F755BC62F3AD73400FDF4E7 /* EmbeddingService.swift */,
 				3F755BC82F3AD73400FDF4E7 /* LibraryStore.swift */,
+				AA0031202A0B4D5600000001 /* ReviewStore.swift */,
 				3F755B882F3AD73400FDF4E5 /* Config.swift */,
 				AA0031112A0B4D5600000001 /* ClaudeService.swift */,
 				AA0031122A0B4D5600000001 /* ConversationStore.swift */,
@@ -202,6 +209,7 @@
 			isa = PBXGroup;
 			children = (
 				3F755B9D2F3AD73400FDF4E4 /* ProfileView.swift */,
+				AA0031222A0B4D5600000001 /* ShelfBookView.swift */,
 			);
 			path = Profile;
 			sourceTree = "<group>";
@@ -232,6 +240,7 @@
 			isa = PBXGroup;
 			children = (
 				3F755B972F3AD73400FDF4E5 /* HighQualityBookImageView.swift */,
+				AA0031212A0B4D5600000001 /* StarRatingView.swift */,
 				3F755BC22F3AD73400FDF4E7 /* CachedAsyncImage.swift */,
 			);
 			path = Shared;
@@ -368,6 +377,9 @@
 				AA0032152A0B4D5600000001 /* BuddyViewModel.swift in Sources */,
 				AA0032162A0B4D5600000001 /* BuddyView.swift in Sources */,
 				AA0032172A0B4D5600000001 /* ChatView.swift in Sources */,
+				AA0032202A0B4D5600000001 /* ReviewStore.swift in Sources */,
+				AA0032212A0B4D5600000001 /* StarRatingView.swift in Sources */,
+				AA0032222A0B4D5600000001 /* ShelfBookView.swift in Sources */,
 				AA0002012A0B4D5600000001 /* AppAppearance.swift in Sources */,
 				3F755BAC2F3AD73400FDF4E4 /* ReviewView.swift in Sources */,
 				3F755BAD2F3AD73400FDF4E4 /* AuthService.swift in Sources */,

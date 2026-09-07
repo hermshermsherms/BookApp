@@ -23,4 +23,27 @@ struct Review: Identifiable, Codable, Equatable {
     var isValid: Bool {
         rating >= 1 && rating <= 5
     }
+
+    /// Whether the user wrote something beyond the star rating.
+    var hasText: Bool {
+        guard let text = reviewText else { return false }
+        return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Plain-English label for a star count, shown next to the picker so the
+    /// rating reads as an opinion rather than a number.
+    static func label(forRating rating: Int) -> String {
+        switch rating {
+        case 1: return "Not for me"
+        case 2: return "It was okay"
+        case 3: return "Good read"
+        case 4: return "Really liked it"
+        case 5: return "A new favorite"
+        default: return "Tap a star to rate"
+        }
+    }
+
+    var ratingLabel: String {
+        Review.label(forRating: rating)
+    }
 }

@@ -1,204 +1,200 @@
 import SwiftUI
+import UIKit
 
+/// Rate a finished book and write a review. Saves to the local `ReviewStore`,
+/// the same on-device source of truth the Library uses.
 struct ReviewView: View {
     let userBook: UserBook
+
     @State private var rating: Int = 0
     @State private var reviewText: String = ""
     @State private var existingReview: Review?
-    @State private var isLoading = false
-    @State private var isSaving = false
-    @State private var error: String?
+    @State private var showDeleteConfirmation = false
 
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var isEditorFocused: Bool
+
+    private let reviewStore = ReviewStore.shared
 
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: Theme.paddingLarge) {
-                    // Book header
-                    HStack(spacing: Theme.paddingMedium) {
-                        AsyncImage(url: URL(string: userBook.book?.thumbnailURL ?? "")) { phase in
-                            switch phase {
-                            case .success(let image):
-                                image
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fill)
-                                    .frame(width: 70, height: 105)
-                                    .cornerRadius(Theme.cornerRadiusSmall)
-                            default:
-                                RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall)
-                                    .fill(Theme.parchment)
-                                    .frame(width: 70, height: 105)
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(userBook.book?.title ?? "Unknown")
-                                .font(Theme.serifBold(20))
-                                .foregroundColor(Theme.primaryText)
-                                .lineLimit(3)
-
-                            Text(userBook.book?.authorDisplay ?? "")
-                                .font(Theme.body(14))
-                                .foregroundColor(Theme.secondaryText)
-                        }
-                    }
-                    .padding(.horizontal)
+                    bookHeader
 
                     Divider()
                         .padding(.horizontal)
 
-                    // Star Rating
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Your Rating")
-                            .font(Theme.serifBold(18))
-                            .foregroundColor(Theme.primaryText)
+                    ratingSection
 
-                        HStack(spacing: 12) {
-                            ForEach(1...5, id: \.self) { star in
-                                Button {
-                                    withAnimation(.spring(response: 0.2)) {
-                                        rating = star
-                                    }
-                                } label: {
-                                    Image(systemName: star <= rating ? "star.fill" : "star")
-                                        .font(.system(size: 36))
-                                        .foregroundColor(star <= rating ? .yellow : Theme.muted.opacity(0.4))
-                                }
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
+                    reviewSection
 
-                    // Review Text
-                    VStack(alignment: .leading, spacing: 10) {
-                        Text("Your Review")
-                            .font(Theme.serifBold(18))
-                            .foregroundColor(Theme.primaryText)
-
-                        TextEditor(text: $reviewText)
-                            .frame(minHeight: 150)
-                            .padding(Theme.paddingSmall)
-                            .background(Theme.parchment)
-                            .cornerRadius(Theme.cornerRadiusMedium)
-                            .font(Theme.body(15))
-                            .foregroundColor(Theme.primaryText)
-                            .scrollContentBackground(.hidden)
-                    }
-                    .padding(.horizontal)
-
-                    // Error
-                    if let error = error {
-                        Text(error)
-                            .font(Theme.caption())
-                            .foregroundColor(.red)
-                            .padding(.horizontal)
-                    }
-
-                    // Save Button
-                    Button {
-                        Task { await saveReview() }
-                    } label: {
-                        HStack {
-                            if isSaving {
-                                ProgressView()
-                                    .tint(.white)
-                            }
-                            Text(existingReview != nil ? "Update Review" : "Save Review")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .primaryButtonStyle()
-                    }
-                    .disabled(rating == 0 || isSaving)
-                    .padding(.horizontal)
-
-                    // Delete Review (if editing)
-                    if existingReview != nil {
-                        Button(role: .destructive) {
-                            Task { await deleteReview() }
-                        } label: {
-                            Text("Delete Review")
-                                .font(Theme.body(15))
-                                .foregroundColor(Theme.negative)
-                                .frame(maxWidth: .infinity)
-                        }
-                        .padding(.horizontal)
-                    }
+                    saveSection
 
                     Spacer(minLength: 40)
                 }
             }
             .background(Theme.background)
-            .navigationTitle("Review")
+            .navigationTitle(existingReview == nil ? "Rate It" : "Your Review")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
                         .foregroundColor(Theme.accent)
                 }
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") { isEditorFocused = false }
+                }
             }
-            .task {
-                await loadExistingReview()
-            }
-        }
-    }
-
-    // MARK: - Load Existing
-
-    private func loadExistingReview() async {
-        guard let userId = AuthService.shared.currentUserId else { return }
-        isLoading = true
-
-        do {
-            if let review = try await SupabaseService.shared.fetchReview(
-                userId: userId,
-                googleBooksId: userBook.googleBooksId
+            .onAppear(perform: loadExistingReview)
+            .confirmationDialog(
+                "Delete this review?",
+                isPresented: $showDeleteConfirmation,
+                titleVisibility: .visible
             ) {
-                existingReview = review
-                rating = review.rating
-                reviewText = review.reviewText ?? ""
+                Button("Delete Review", role: .destructive, action: deleteReview)
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Your rating and review text will be removed from your profile.")
             }
-        } catch {
-            // No existing review — that's fine
         }
-
-        isLoading = false
     }
 
-    // MARK: - Save
+    // MARK: - Sections
 
-    private func saveReview() async {
-        guard let userId = AuthService.shared.currentUserId, rating > 0 else { return }
+    private var bookHeader: some View {
+        HStack(spacing: Theme.paddingMedium) {
+            AsyncImage(url: URL(string: userBook.book?.thumbnailURL ?? "")) { phase in
+                switch phase {
+                case .success(let image):
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: 70, height: 105)
+                        .cornerRadius(Theme.cornerRadiusSmall)
+                default:
+                    RoundedRectangle(cornerRadius: Theme.cornerRadiusSmall)
+                        .fill(Theme.parchment)
+                        .frame(width: 70, height: 105)
+                }
+            }
 
-        isSaving = true
-        error = nil
+            VStack(alignment: .leading, spacing: 4) {
+                Text(userBook.book?.title ?? "Unknown")
+                    .font(Theme.serifBold(20))
+                    .foregroundColor(Theme.primaryText)
+                    .lineLimit(3)
 
-        do {
-            let review = try await SupabaseService.shared.upsertReview(
-                userId: userId,
-                googleBooksId: userBook.googleBooksId,
-                rating: rating,
-                reviewText: reviewText.isEmpty ? nil : reviewText
-            )
-            existingReview = review
-            dismiss()
-        } catch {
-            self.error = error.localizedDescription
+                Text(userBook.book?.authorDisplay ?? "")
+                    .font(Theme.body(14))
+                    .foregroundColor(Theme.secondaryText)
+            }
         }
-
-        isSaving = false
+        .padding(.horizontal)
     }
 
-    // MARK: - Delete
+    private var ratingSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Your Rating")
+                .font(Theme.serifBold(18))
+                .foregroundColor(Theme.primaryText)
 
-    private func deleteReview() async {
-        guard let review = existingReview else { return }
+            StarRatingPicker(rating: $rating)
 
-        do {
-            try await SupabaseService.shared.deleteReview(reviewId: review.id)
-            dismiss()
-        } catch {
-            self.error = error.localizedDescription
+            Text(Review.label(forRating: rating))
+                .font(Theme.body(15))
+                .foregroundColor(rating == 0 ? Theme.muted : Theme.accent)
+                .animation(.easeInOut(duration: 0.15), value: rating)
         }
+        .padding(.horizontal)
+    }
+
+    private var reviewSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Your Review")
+                    .font(Theme.serifBold(18))
+                    .foregroundColor(Theme.primaryText)
+
+                Spacer()
+
+                Text("Optional")
+                    .font(Theme.caption(12))
+                    .foregroundColor(Theme.muted)
+            }
+
+            ZStack(alignment: .topLeading) {
+                TextEditor(text: $reviewText)
+                    .frame(minHeight: 150)
+                    .padding(Theme.paddingSmall)
+                    .background(Theme.parchment)
+                    .cornerRadius(Theme.cornerRadiusMedium)
+                    .font(Theme.body(15))
+                    .foregroundColor(Theme.primaryText)
+                    .scrollContentBackground(.hidden)
+                    .focused($isEditorFocused)
+
+                if reviewText.isEmpty {
+                    Text("What stuck with you?")
+                        .font(Theme.body(15))
+                        .foregroundColor(Theme.muted.opacity(0.7))
+                        .padding(.horizontal, Theme.paddingSmall + 5)
+                        .padding(.vertical, Theme.paddingSmall + 8)
+                        .allowsHitTesting(false)
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    private var saveSection: some View {
+        VStack(spacing: Theme.paddingMedium) {
+            Button(action: saveReview) {
+                Text(existingReview != nil ? "Update Review" : "Save Review")
+                    .frame(maxWidth: .infinity)
+                    .primaryButtonStyle()
+                    .opacity(rating == 0 ? 0.5 : 1)
+            }
+            .disabled(rating == 0)
+
+            if existingReview != nil {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Text("Delete Review")
+                        .font(Theme.body(15))
+                        .foregroundColor(Theme.negative)
+                        .frame(maxWidth: .infinity)
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+
+    // MARK: - Actions
+
+    private func loadExistingReview() {
+        guard let review = reviewStore.review(forGoogleBooksId: userBook.googleBooksId) else { return }
+        existingReview = review
+        rating = review.rating
+        reviewText = review.reviewText ?? ""
+    }
+
+    private func saveReview() {
+        guard rating > 0 else { return }
+        reviewStore.upsert(
+            userId: userBook.userId,
+            googleBooksId: userBook.googleBooksId,
+            rating: rating,
+            reviewText: reviewText
+        )
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        dismiss()
+    }
+
+    private func deleteReview() {
+        reviewStore.remove(googleBooksId: userBook.googleBooksId)
+        dismiss()
     }
 }

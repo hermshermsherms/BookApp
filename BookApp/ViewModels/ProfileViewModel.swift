@@ -2,30 +2,91 @@ import SwiftUI
 
 @MainActor
 final class ProfileViewModel: ObservableObject {
-    @Published var displayName: String = ""
-    @Published var booksRead: Int = 0
-    @Published var reviewsWritten: Int = 0
-    @Published var totalBooks: Int = 0
-    @Published var isLoading = false
-    @Published var error: String?
 
-    private let supabaseService = SupabaseService.shared
+    /// One finished book paired with its review, ready for the shelf grid.
+    struct ShelfItem: Identifiable {
+        let userBook: UserBook
+        let review: Review?
 
-    func loadProfile() async {
-        guard let userId = AuthService.shared.currentUserId else { return }
+        var id: UUID { userBook.id }
+        var book: Book? { userBook.book }
+        var rating: Int { review?.rating ?? 0 }
+        var title: String { userBook.book?.title ?? "Unknown Title" }
+    }
 
-        displayName = AuthService.shared.displayName ?? "Reader"
-        isLoading = true
+    struct Stats {
+        let booksRead: Int
+        let reviewsWritten: Int
+        let totalBooks: Int
+        let averageRating: Double?
+    }
 
-        do {
-            let stats = try await supabaseService.fetchUserStats(userId: userId)
-            booksRead = stats.booksRead
-            reviewsWritten = stats.reviewsWritten
-            totalBooks = stats.totalBooks
-        } catch {
-            self.error = error.localizedDescription
+    enum ShelfSort: String, CaseIterable, Identifiable {
+        case recent
+        case rating
+        case title
+
+        var id: String { rawValue }
+
+        var displayName: String {
+            switch self {
+            case .recent: return "Recently Finished"
+            case .rating: return "Highest Rated"
+            case .title: return "Title"
+            }
         }
 
-        isLoading = false
+        var iconName: String {
+            switch self {
+            case .recent: return "clock"
+            case .rating: return "star"
+            case .title: return "textformat.abc"
+            }
+        }
+    }
+
+    @Published var displayName: String = "Reader"
+    @Published var sort: ShelfSort = .recent
+
+    func refreshDisplayName() {
+        displayName = AuthService.shared.displayName ?? "Reader"
+    }
+
+    // MARK: - Shelf
+
+    /// The user's finished books, each joined to its review, in the current sort order.
+    func shelf(books: [UserBook], reviews: [Review]) -> [ShelfItem] {
+        let reviewsByBook = Dictionary(
+            reviews.map { ($0.googleBooksId, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+
+        let items = books
+            .filter { $0.status == .read }
+            .map { ShelfItem(userBook: $0, review: reviewsByBook[$0.googleBooksId]) }
+
+        switch sort {
+        case .recent:
+            return items.sorted { $0.userBook.updatedAt > $1.userBook.updatedAt }
+        case .rating:
+            // Ties fall back to most recently finished.
+            return items.sorted { ($0.rating, $0.userBook.updatedAt) > ($1.rating, $1.userBook.updatedAt) }
+        case .title:
+            return items.sorted { $0.title.localizedCaseInsensitiveCompare($1.title) == .orderedAscending }
+        }
+    }
+
+    // MARK: - Stats
+
+    func stats(books: [UserBook], reviews: [Review]) -> Stats {
+        let ratings = reviews.map(\.rating)
+        let average = ratings.isEmpty ? nil : Double(ratings.reduce(0, +)) / Double(ratings.count)
+
+        return Stats(
+            booksRead: books.filter { $0.status == .read }.count,
+            reviewsWritten: reviews.count,
+            totalBooks: books.count,
+            averageRating: average
+        )
     }
 }

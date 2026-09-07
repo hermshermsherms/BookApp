@@ -42,6 +42,9 @@ final class LibraryViewModel: ObservableObject {
 
     func deleteBook(_ userBook: UserBook) async {
         libraryStore.remove(id: userBook.id)
+        // The review belongs to the shelf entry, so it goes with it — otherwise
+        // it would linger in the profile's review count with no book attached.
+        ReviewStore.shared.remove(googleBooksId: userBook.googleBooksId)
         await fetchLibrary()
     }
 

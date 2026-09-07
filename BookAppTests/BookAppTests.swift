@@ -310,3 +310,134 @@ class SwipeActionTests: XCTestCase {
         XCTAssertEqual(swipeAction.action, decoded.action)
     }
 }
+
+// MARK: - Profile Shelf Tests
+
+@MainActor
+class ProfileShelfTests: XCTestCase {
+
+    private let userId = UUID()
+
+    private func makeBook(id: String, title: String) -> Book {
+        Book(
+            id: id,
+            title: title,
+            authors: ["Author"],
+            description: nil,
+            categories: [],
+            averageRating: nil,
+            pageCount: nil,
+            publishedDate: nil,
+            thumbnailURL: nil,
+            largeCoverURL: nil,
+            infoLink: nil
+        )
+    }
+
+    private func makeUserBook(id: String, title: String, status: BookStatus, finishedAt: Date) -> UserBook {
+        var userBook = UserBook(
+            id: UUID(),
+            userId: userId,
+            googleBooksId: id,
+            status: status,
+            addedAt: finishedAt,
+            updatedAt: finishedAt,
+            book: nil
+        )
+        userBook.book = makeBook(id: id, title: title)
+        return userBook
+    }
+
+    private func makeReview(bookId: String, rating: Int, text: String? = nil) -> Review {
+        Review(
+            id: UUID(),
+            userId: userId,
+            googleBooksId: bookId,
+            rating: rating,
+            reviewText: text,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+    }
+
+    func testShelfOnlyIncludesReadBooks() {
+        let viewModel = ProfileViewModel()
+        let books = [
+            makeUserBook(id: "a", title: "Finished", status: .read, finishedAt: Date()),
+            makeUserBook(id: "b", title: "In Progress", status: .reading, finishedAt: Date()),
+            makeUserBook(id: "c", title: "Saved", status: .wantToRead, finishedAt: Date()),
+        ]
+
+        let shelf = viewModel.shelf(books: books, reviews: [])
+
+        XCTAssertEqual(shelf.count, 1)
+        XCTAssertEqual(shelf.first?.userBook.googleBooksId, "a")
+    }
+
+    func testShelfJoinsReviewsToBooks() {
+        let viewModel = ProfileViewModel()
+        let books = [makeUserBook(id: "a", title: "Finished", status: .read, finishedAt: Date())]
+        let reviews = [makeReview(bookId: "a", rating: 4, text: "Loved the ending.")]
+
+        let shelf = viewModel.shelf(books: books, reviews: reviews)
+
+        XCTAssertEqual(shelf.first?.rating, 4)
+        XCTAssertEqual(shelf.first?.review?.hasText, true)
+    }
+
+    func testShelfSortsByRecentThenRatingThenTitle() {
+        let viewModel = ProfileViewModel()
+        let old = Date(timeIntervalSince1970: 1_000)
+        let recent = Date(timeIntervalSince1970: 2_000)
+
+        let books = [
+            makeUserBook(id: "a", title: "Zebra", status: .read, finishedAt: old),
+            makeUserBook(id: "b", title: "Apple", status: .read, finishedAt: recent),
+        ]
+        let reviews = [
+            makeReview(bookId: "a", rating: 5),
+            makeReview(bookId: "b", rating: 2),
+        ]
+
+        viewModel.sort = .recent
+        XCTAssertEqual(viewModel.shelf(books: books, reviews: reviews).map(\.title), ["Apple", "Zebra"])
+
+        viewModel.sort = .rating
+        XCTAssertEqual(viewModel.shelf(books: books, reviews: reviews).map(\.title), ["Zebra", "Apple"])
+
+        viewModel.sort = .title
+        XCTAssertEqual(viewModel.shelf(books: books, reviews: reviews).map(\.title), ["Apple", "Zebra"])
+    }
+
+    func testStatsCountAndAverage() {
+        let viewModel = ProfileViewModel()
+        let books = [
+            makeUserBook(id: "a", title: "One", status: .read, finishedAt: Date()),
+            makeUserBook(id: "b", title: "Two", status: .read, finishedAt: Date()),
+            makeUserBook(id: "c", title: "Three", status: .wantToRead, finishedAt: Date()),
+        ]
+        let reviews = [
+            makeReview(bookId: "a", rating: 5),
+            makeReview(bookId: "b", rating: 2),
+        ]
+
+        let stats = viewModel.stats(books: books, reviews: reviews)
+
+        XCTAssertEqual(stats.booksRead, 2)
+        XCTAssertEqual(stats.reviewsWritten, 2)
+        XCTAssertEqual(stats.totalBooks, 3)
+        XCTAssertEqual(stats.averageRating ?? 0, 3.5, accuracy: 0.001)
+    }
+
+    func testStatsAverageIsNilWithoutReviews() {
+        let viewModel = ProfileViewModel()
+        let books = [makeUserBook(id: "a", title: "One", status: .read, finishedAt: Date())]
+
+        XCTAssertNil(viewModel.stats(books: books, reviews: []).averageRating)
+    }
+
+    func testRatingLabels() {
+        XCTAssertEqual(Review.label(forRating: 0), "Tap a star to rate")
+        XCTAssertEqual(Review.label(forRating: 5), "A new favorite")
+    }
+}
