@@ -21,7 +21,7 @@ struct BookDetailView: View {
                     // Cover image
                     HStack {
                         Spacer()
-                        AsyncImage(url: highResImageURL) { phase in
+                        CachedAsyncImage(url: highResImageURL) { phase in
                             switch phase {
                             case .success(let image):
                                 image
@@ -38,8 +38,6 @@ struct BookDetailView: View {
                                             .font(.system(size: 40))
                                             .foregroundColor(Theme.muted)
                                     )
-                            @unknown default:
-                                EmptyView()
                             }
                         }
                         .shadow(color: Theme.espresso.opacity(0.2), radius: 12, y: 8)
@@ -139,7 +137,7 @@ struct BookDetailView: View {
                     // Similar Books
                     if !similarBooks.isEmpty {
                         VStack(alignment: .leading, spacing: 12) {
-                            Text("You Might Also Like")
+                            Text("Similar Books")
                                 .font(Theme.serifBold(18))
                                 .foregroundColor(Theme.primaryText)
                                 .padding(.horizontal)
@@ -148,7 +146,7 @@ struct BookDetailView: View {
                                 HStack(spacing: 14) {
                                     ForEach(similarBooks) { similarBook in
                                         VStack(spacing: 6) {
-                                            AsyncImage(url: similarBook.highQualityImageURL) { phase in
+                                            CachedAsyncImage(url: similarBook.highQualityImageURL) { phase in
                                                 switch phase {
                                                 case .success(let image):
                                                     image
@@ -166,8 +164,6 @@ struct BookDetailView: View {
                                                                 .font(.system(size: 24))
                                                                 .foregroundColor(Theme.muted)
                                                         )
-                                                @unknown default:
-                                                    EmptyView()
                                                 }
                                             }
                                             Text(similarBook.title)
@@ -229,28 +225,35 @@ struct BookDetailView: View {
     private func loadSimilarBooks() async {
         isLoadingSimilar = true
         do {
-            similarBooks = try await GoogleBooksService.shared.fetchSimilarBooks(to: book)
-            // If no similar books found, try a broader search
-            if similarBooks.isEmpty {
-                similarBooks = try await GoogleBooksService.shared.fetchTrendingBooks(maxResults: 6)
+            // Retrieve candidates by shared author/genre, then rank by how semantically
+            // close they are to this book (embedding similarity).
+            var candidates = try await GoogleBooksService.shared.fetchSimilarBooks(to: book, maxResults: 20)
+            if candidates.isEmpty {
+                candidates = try await GoogleBooksService.shared.fetchTrendingBooks(maxResults: 20)
                     .filter { $0.id != book.id }
-                    .prefix(4)
-                    .map { $0 }
             }
+            similarBooks = await rankedBySimilarity(candidates)
         } catch {
-            // Fallback to some mock similar books to maintain consistency
-            similarBooks = mockSimilarBooks()
+            // Do not invent placeholder recommendations when the service is unavailable.
+            similarBooks = []
         }
         isLoadingSimilar = false
     }
-    
-    private func mockSimilarBooks() -> [Book] {
-        let genre = book.genreDisplay.lowercased()
-        let mockBooks = [
-            Book(id: "similar1", title: "Recommended Reading", authors: ["Popular Author"], description: "A great book in the \(genre) genre", categories: [genre], averageRating: 4.2, pageCount: 300, publishedDate: "2023", thumbnailURL: nil, largeCoverURL: nil, infoLink: nil),
-            Book(id: "similar2", title: "Editor's Pick", authors: ["Bestselling Writer"], description: "Another excellent choice", categories: [genre], averageRating: 4.5, pageCount: 280, publishedDate: "2023", thumbnailURL: nil, largeCoverURL: nil, infoLink: nil),
-            Book(id: "similar3", title: "Reader's Choice", authors: ["Award Winner"], description: "Highly rated by readers", categories: [genre], averageRating: 4.3, pageCount: 320, publishedDate: "2023", thumbnailURL: nil, largeCoverURL: nil, infoLink: nil)
-        ]
-        return Array(mockBooks.prefix(3))
+
+    /// Sorts candidates by embedding similarity to the current book (falls back to
+    /// the given order if embeddings are unavailable).
+    private func rankedBySimilarity(_ candidates: [Book]) async -> [Book] {
+        let pool = candidates.filter { $0.id != book.id }
+        guard let reference = await EmbeddingService.shared.embed(id: book.id, text: book.embeddingText) else {
+            return Array(pool.prefix(10))
+        }
+        var scored: [(book: Book, score: Double)] = []
+        for candidate in pool {
+            let vector = await EmbeddingService.shared.embed(id: candidate.id, text: candidate.embeddingText)
+            let similarity = vector.map { EmbeddingService.cosine($0, reference) } ?? 0
+            scored.append((candidate, similarity))
+        }
+        return scored.sorted { $0.score > $1.score }.prefix(10).map { $0.book }
     }
+    
 }

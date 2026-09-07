@@ -1,6 +1,9 @@
 # Xcode
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
+# per-user Xcode UI state, at any nesting level
+xcuserdata/
+*.xcuserstate
 DerivedData/
 *.hmap
 *.ipa
@@ -20,3 +23,6 @@ Package.resolved
 # IDE
 .idea/
 *.xcworkspace/contents.xcworkspacedata
+
+# Secrets — local API keys, never commit (copy Secrets.example.swift → Secrets.swift)
+BookApp/Secrets.swift

@@ -19,6 +19,15 @@
 		3F755BA92F3AD73400FDF4E4 /* PurchaseSheetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B962F3AD73400FDF4E4 /* PurchaseSheetView.swift */; };
 		3F755BAA2F3AD73400FDF4E4 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B8C2F3AD73400FDF4E4 /* AuthViewModel.swift */; };
 		3F755BAB2F3AD73400FDF4E4 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B8A2F3AD73400FDF4E4 /* Theme.swift */; };
+		AA0032102A0B4D5600000001 /* ReadingBuddy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031102A0B4D5600000001 /* ReadingBuddy.swift */; };
+		AA0032112A0B4D5600000001 /* ClaudeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031112A0B4D5600000001 /* ClaudeService.swift */; };
+		AA0032122A0B4D5600000001 /* ConversationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031122A0B4D5600000001 /* ConversationStore.swift */; };
+		AA0032132A0B4D5600000001 /* BuddyPrompt.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031132A0B4D5600000001 /* BuddyPrompt.swift */; };
+		AA0032142A0B4D5600000001 /* VoiceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031142A0B4D5600000001 /* VoiceController.swift */; };
+		AA0032152A0B4D5600000001 /* BuddyViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031152A0B4D5600000001 /* BuddyViewModel.swift */; };
+		AA0032162A0B4D5600000001 /* BuddyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031162A0B4D5600000001 /* BuddyView.swift */; };
+		AA0032172A0B4D5600000001 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0031172A0B4D5600000001 /* ChatView.swift */; };
+		AA0002012A0B4D5600000001 /* AppAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0002002A0B4D5600000001 /* AppAppearance.swift */; };
 		3F755BAC2F3AD73400FDF4E4 /* ReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B9B2F3AD73400FDF4E4 /* ReviewView.swift */; };
 		3F755BAD2F3AD73400FDF4E4 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B852F3AD73400FDF4E4 /* AuthService.swift */; };
 		3F755BAE2F3AD73400FDF4E4 /* BookSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B992F3AD73400FDF4E4 /* BookSearchView.swift */; };
@@ -30,13 +39,19 @@
 		3F755BB42F3AD73400FDF4E4 /* LibraryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B8E2F3AD73400FDF4E4 /* LibraryViewModel.swift */; };
 		3F755BB52F3AD73400FDF4E4 /* Review.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B812F3AD73400FDF4E4 /* Review.swift */; };
 		3F755BB62F3AD73400FDF4E4 /* BookDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B942F3AD73400FDF4E4 /* BookDetailView.swift */; };
+		3F755BB72F3AD73400FDF4E5 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B842F3AD73400FDF4E5 /* User.swift */; };
+		3F755BB82F3AD73400FDF4E5 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B882F3AD73400FDF4E5 /* Config.swift */; };
+		3F755BB92F3AD73400FDF4E5 /* HighQualityBookImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B972F3AD73400FDF4E5 /* HighQualityBookImageView.swift */; };
+		3F755BC32F3AD73400FDF4E7 /* CachedAsyncImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755BC22F3AD73400FDF4E7 /* CachedAsyncImage.swift */; };
+		3F755BC52F3AD73400FDF4E7 /* RecommendationEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755BC42F3AD73400FDF4E7 /* RecommendationEngine.swift */; };
+		3F755BC72F3AD73400FDF4E7 /* EmbeddingService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755BC62F3AD73400FDF4E7 /* EmbeddingService.swift */; };
+		3F755BC92F3AD73400FDF4E7 /* LibraryStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755BC82F3AD73400FDF4E7 /* LibraryStore.swift */; };
 		AA0001D82A0B4D5600000001 /* BookAppApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001D72A0B4D5600000001 /* BookAppApp.swift */; };
 		AA0001DA2A0B4D5600000001 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0001D92A0B4D5600000001 /* ContentView.swift */; };
 		AA0001DC2A0B4D5700000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0001DB2A0B4D5700000001 /* Assets.xcassets */; };
 		AA0001DF2A0B4D5700000001 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0001DE2A0B4D5700000001 /* Preview Assets.xcassets */; };
-		3F755BB72F3AD73400FDF4E5 /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B842F3AD73400FDF4E5 /* User.swift */; };
-		3F755BB82F3AD73400FDF4E5 /* Config.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B882F3AD73400FDF4E5 /* Config.swift */; };
-		3F755BB92F3AD73400FDF4E5 /* HighQualityBookImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F755B972F3AD73400FDF4E5 /* HighQualityBookImageView.swift */; };
+		B10000012F42000100000001 /* Secrets.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000022F42000100000001 /* Secrets.swift */; };
+		B10000032F42000100000001 /* EPUBReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B10000042F42000100000001 /* EPUBReaderView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -51,6 +66,15 @@
 		3F755B882F3AD73400FDF4E5 /* Config.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Config.swift; sourceTree = "<group>"; };
 		3F755B892F3AD73400FDF4E4 /* Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
 		3F755B8A2F3AD73400FDF4E4 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		AA0031102A0B4D5600000001 /* ReadingBuddy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadingBuddy.swift; sourceTree = "<group>"; };
+		AA0031112A0B4D5600000001 /* ClaudeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeService.swift; sourceTree = "<group>"; };
+		AA0031122A0B4D5600000001 /* ConversationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConversationStore.swift; sourceTree = "<group>"; };
+		AA0031132A0B4D5600000001 /* BuddyPrompt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyPrompt.swift; sourceTree = "<group>"; };
+		AA0031142A0B4D5600000001 /* VoiceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceController.swift; sourceTree = "<group>"; };
+		AA0031152A0B4D5600000001 /* BuddyViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyViewModel.swift; sourceTree = "<group>"; };
+		AA0031162A0B4D5600000001 /* BuddyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuddyView.swift; sourceTree = "<group>"; };
+		AA0031172A0B4D5600000001 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		AA0002002A0B4D5600000001 /* AppAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppAppearance.swift; sourceTree = "<group>"; };
 		3F755B8C2F3AD73400FDF4E4 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		3F755B8D2F3AD73400FDF4E4 /* DiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiscoveryViewModel.swift; sourceTree = "<group>"; };
 		3F755B8E2F3AD73400FDF4E4 /* LibraryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryViewModel.swift; sourceTree = "<group>"; };
@@ -66,11 +90,17 @@
 		3F755B9A2F3AD73400FDF4E4 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		3F755B9B2F3AD73400FDF4E4 /* ReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReviewView.swift; sourceTree = "<group>"; };
 		3F755B9D2F3AD73400FDF4E4 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		3F755BC22F3AD73400FDF4E7 /* CachedAsyncImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedAsyncImage.swift; sourceTree = "<group>"; };
+		3F755BC42F3AD73400FDF4E7 /* RecommendationEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendationEngine.swift; sourceTree = "<group>"; };
+		3F755BC62F3AD73400FDF4E7 /* EmbeddingService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddingService.swift; sourceTree = "<group>"; };
+		3F755BC82F3AD73400FDF4E7 /* LibraryStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryStore.swift; sourceTree = "<group>"; };
 		AA0001D42A0B4D5600000001 /* BookApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BookApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA0001D72A0B4D5600000001 /* BookAppApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookAppApp.swift; sourceTree = "<group>"; };
 		AA0001D92A0B4D5600000001 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		AA0001DB2A0B4D5700000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA0001DE2A0B4D5700000001 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		B10000022F42000100000001 /* Secrets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Secrets.swift; sourceTree = "<group>"; };
+		B10000042F42000100000001 /* EPUBReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,6 +118,7 @@
 			isa = PBXGroup;
 			children = (
 				3F755B802F3AD73400FDF4E4 /* Book.swift */,
+				AA0031102A0B4D5600000001 /* ReadingBuddy.swift */,
 				3F755B812F3AD73400FDF4E4 /* Review.swift */,
 				3F755B822F3AD73400FDF4E4 /* SwipeAction.swift */,
 				3F755B832F3AD73400FDF4E4 /* UserBook.swift */,
@@ -102,7 +133,14 @@
 				3F755B852F3AD73400FDF4E4 /* AuthService.swift */,
 				3F755B862F3AD73400FDF4E4 /* GoogleBooksService.swift */,
 				3F755B872F3AD73400FDF4E4 /* SupabaseService.swift */,
+				3F755BC42F3AD73400FDF4E7 /* RecommendationEngine.swift */,
+				3F755BC62F3AD73400FDF4E7 /* EmbeddingService.swift */,
+				3F755BC82F3AD73400FDF4E7 /* LibraryStore.swift */,
 				3F755B882F3AD73400FDF4E5 /* Config.swift */,
+				AA0031112A0B4D5600000001 /* ClaudeService.swift */,
+				AA0031122A0B4D5600000001 /* ConversationStore.swift */,
+				AA0031132A0B4D5600000001 /* BuddyPrompt.swift */,
+				AA0031142A0B4D5600000001 /* VoiceController.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -112,6 +150,7 @@
 			children = (
 				3F755B892F3AD73400FDF4E4 /* Extensions.swift */,
 				3F755B8A2F3AD73400FDF4E4 /* Theme.swift */,
+				AA0002002A0B4D5600000001 /* AppAppearance.swift */,
 			);
 			path = Utilities;
 			sourceTree = "<group>";
@@ -120,6 +159,7 @@
 			isa = PBXGroup;
 			children = (
 				3F755B8C2F3AD73400FDF4E4 /* AuthViewModel.swift */,
+				AA0031152A0B4D5600000001 /* BuddyViewModel.swift */,
 				3F755B8D2F3AD73400FDF4E4 /* DiscoveryViewModel.swift */,
 				3F755B8E2F3AD73400FDF4E4 /* LibraryViewModel.swift */,
 				3F755B8F2F3AD73400FDF4E4 /* ProfileViewModel.swift */,
@@ -142,6 +182,7 @@
 				3F755B942F3AD73400FDF4E4 /* BookDetailView.swift */,
 				3F755B952F3AD73400FDF4E4 /* DiscoveryFeedView.swift */,
 				3F755B962F3AD73400FDF4E4 /* PurchaseSheetView.swift */,
+				B10000042F42000100000001 /* EPUBReaderView.swift */,
 			);
 			path = Discovery;
 			sourceTree = "<group>";
@@ -165,10 +206,20 @@
 			path = Profile;
 			sourceTree = "<group>";
 		};
+		AA0003002A0B4D5600000001 /* Buddy */ = {
+			isa = PBXGroup;
+			children = (
+				AA0031162A0B4D5600000001 /* BuddyView.swift */,
+				AA0031172A0B4D5600000001 /* ChatView.swift */,
+			);
+			path = Buddy;
+			sourceTree = "<group>";
+		};
 		3F755B9F2F3AD73400FDF4E4 /* Views */ = {
 			isa = PBXGroup;
 			children = (
 				3F755B922F3AD73400FDF4E4 /* Auth */,
+				AA0003002A0B4D5600000001 /* Buddy */,
 				3F755B972F3AD73400FDF4E4 /* Discovery */,
 				3F755B9C2F3AD73400FDF4E4 /* Library */,
 				3F755B9E2F3AD73400FDF4E4 /* Profile */,
@@ -181,6 +232,7 @@
 			isa = PBXGroup;
 			children = (
 				3F755B972F3AD73400FDF4E5 /* HighQualityBookImageView.swift */,
+				3F755BC22F3AD73400FDF4E7 /* CachedAsyncImage.swift */,
 			);
 			path = Shared;
 			sourceTree = "<group>";
@@ -211,6 +263,7 @@
 				3F755B9F2F3AD73400FDF4E4 /* Views */,
 				AA0001D72A0B4D5600000001 /* BookAppApp.swift */,
 				AA0001D92A0B4D5600000001 /* ContentView.swift */,
+				B10000022F42000100000001 /* Secrets.swift */,
 				AA0001DB2A0B4D5700000001 /* Assets.xcassets */,
 				AA0001DD2A0B4D5700000001 /* Preview Content */,
 			);
@@ -307,6 +360,15 @@
 				3F755BA92F3AD73400FDF4E4 /* PurchaseSheetView.swift in Sources */,
 				3F755BAA2F3AD73400FDF4E4 /* AuthViewModel.swift in Sources */,
 				3F755BAB2F3AD73400FDF4E4 /* Theme.swift in Sources */,
+				AA0032102A0B4D5600000001 /* ReadingBuddy.swift in Sources */,
+				AA0032112A0B4D5600000001 /* ClaudeService.swift in Sources */,
+				AA0032122A0B4D5600000001 /* ConversationStore.swift in Sources */,
+				AA0032132A0B4D5600000001 /* BuddyPrompt.swift in Sources */,
+				AA0032142A0B4D5600000001 /* VoiceController.swift in Sources */,
+				AA0032152A0B4D5600000001 /* BuddyViewModel.swift in Sources */,
+				AA0032162A0B4D5600000001 /* BuddyView.swift in Sources */,
+				AA0032172A0B4D5600000001 /* ChatView.swift in Sources */,
+				AA0002012A0B4D5600000001 /* AppAppearance.swift in Sources */,
 				3F755BAC2F3AD73400FDF4E4 /* ReviewView.swift in Sources */,
 				3F755BAD2F3AD73400FDF4E4 /* AuthService.swift in Sources */,
 				3F755BAE2F3AD73400FDF4E4 /* BookSearchView.swift in Sources */,
@@ -323,6 +385,12 @@
 				3F755BB72F3AD73400FDF4E5 /* User.swift in Sources */,
 				3F755BB82F3AD73400FDF4E5 /* Config.swift in Sources */,
 				3F755BB92F3AD73400FDF4E5 /* HighQualityBookImageView.swift in Sources */,
+				3F755BC32F3AD73400FDF4E7 /* CachedAsyncImage.swift in Sources */,
+				3F755BC52F3AD73400FDF4E7 /* RecommendationEngine.swift in Sources */,
+				3F755BC72F3AD73400FDF4E7 /* EmbeddingService.swift in Sources */,
+				3F755BC92F3AD73400FDF4E7 /* LibraryStore.swift in Sources */,
+				B10000012F42000100000001 /* Secrets.swift in Sources */,
+				B10000032F42000100000001 /* EPUBReaderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -455,8 +523,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"BookApp/Preview Content\"";
+				DEVELOPMENT_TEAM = WDW6R48673;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_GOOGLE_BOOKS_API_KEY = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BookApp uses the microphone so you can talk to your reading buddy instead of typing.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Speech recognition turns what you say into questions for your reading buddy.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -467,7 +539,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.bookapp.BookApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jeremystaub.BookApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
@@ -483,8 +555,12 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"BookApp/Preview Content\"";
+				DEVELOPMENT_TEAM = WDW6R48673;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_GOOGLE_BOOKS_API_KEY = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "BookApp uses the microphone so you can talk to your reading buddy instead of typing.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Speech recognition turns what you say into questions for your reading buddy.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -495,7 +571,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.bookapp.BookApp;
+				PRODUCT_BUNDLE_IDENTIFIER = com.jeremystaub.BookApp;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;

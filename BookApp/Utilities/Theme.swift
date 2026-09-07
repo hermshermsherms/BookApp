@@ -11,6 +11,9 @@ enum Theme {
     static let sage = Color(red: 0.55, green: 0.65, blue: 0.50)
     static let dustyRose = Color(red: 0.78, green: 0.55, blue: 0.55)
     static let muted = Color(red: 0.60, green: 0.55, blue: 0.50)
+    /// Bar background for the full-bleed dark Discovery feed. Near-black rather
+    /// than pure black so the tab bar still reads as a distinct surface.
+    static let feedChrome = Color(red: 0.05, green: 0.04, blue: 0.04)
 
     // MARK: - Semantic Colors
     static let background = cream

@@ -16,6 +16,9 @@ struct BookSearchView: View {
                         .font(Theme.body(16))
                         .foregroundColor(Theme.primaryText)
                         .autocorrectionDisabled()
+                        .onChange(of: viewModel.searchQuery) { _ in
+                            viewModel.searchDebounced()
+                        }
                         .onSubmit {
                             Task { await viewModel.searchBooks() }
                         }

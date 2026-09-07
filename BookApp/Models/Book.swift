@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represents a book from the Google Books API
-struct Book: Identifiable, Codable, Equatable {
+struct Book: Identifiable, Codable, Equatable, Hashable {
     let id: String // Google Books volume ID
     let title: String
     let authors: [String]
@@ -13,9 +13,49 @@ struct Book: Identifiable, Codable, Equatable {
     let thumbnailURL: String?
     let largeCoverURL: String?
     let infoLink: String?
+    let epubURL: String?
+
+    init(
+        id: String,
+        title: String,
+        authors: [String],
+        description: String?,
+        categories: [String],
+        averageRating: Double?,
+        pageCount: Int?,
+        publishedDate: String?,
+        thumbnailURL: String?,
+        largeCoverURL: String?,
+        infoLink: String?,
+        epubURL: String? = nil
+    ) {
+        self.id = id
+        self.title = title
+        self.authors = authors
+        self.description = description
+        self.categories = categories
+        self.averageRating = averageRating
+        self.pageCount = pageCount
+        self.publishedDate = publishedDate
+        self.thumbnailURL = thumbnailURL
+        self.largeCoverURL = largeCoverURL
+        self.infoLink = infoLink
+        self.epubURL = epubURL
+    }
 
     var authorDisplay: String {
         authors.joined(separator: ", ")
+    }
+
+    /// Primary author, used for feed author-diversity (the "gap" rule).
+    var primaryAuthor: String {
+        authors.first ?? "Unknown"
+    }
+
+    /// Publication year parsed from the (string) published date, if available.
+    var publicationYear: Int? {
+        guard let publishedDate = publishedDate, publishedDate.count >= 4 else { return nil }
+        return Int(publishedDate.prefix(4))
     }
 
     var genreDisplay: String {
@@ -30,6 +70,16 @@ struct Book: Identifiable, Codable, Equatable {
         return desc
     }
 
+    /// Text fed to the on-device embedding model to build a semantic vector for
+    /// this book (title + authors + genres + description).
+    var embeddingText: String {
+        var parts: [String] = [title]
+        if !authors.isEmpty { parts.append(authors.joined(separator: ", ")) }
+        if !categories.isEmpty { parts.append(categories.joined(separator: ", ")) }
+        if let description = description, !description.isEmpty { parts.append(description) }
+        return parts.joined(separator: ". ")
+    }
+
     var ratingDisplay: String {
         guard let rating = averageRating else { return "—" }
         return String(format: "%.1f", rating)
@@ -40,14 +90,25 @@ struct Book: Identifiable, Codable, Equatable {
         return "\(pages) pages"
     }
     
-    /// Returns the highest quality image URL available, falling back gracefully
+    /// Returns the highest quality image URL available, falling back gracefully.
     var highQualityImageURL: URL? {
-        if let largeCoverURL = largeCoverURL, !largeCoverURL.isEmpty {
-            return URL(string: largeCoverURL)
-        } else if let thumbnailURL = thumbnailURL, !thumbnailURL.isEmpty {
-            return URL(string: thumbnailURL)
+        upgradedCoverURL(from: largeCoverURL) ?? upgradedCoverURL(from: thumbnailURL)
+    }
+
+    /// Google's Books API only advertises a ~128px `thumbnail` for most volumes,
+    /// which looks grainy at full-card size. Google actually hosts the full scan,
+    /// so we request a larger render via `&w=` and drop the page-curl effect.
+    /// Non-Google URLs (e.g. Open Library) are returned as-is (https-normalized).
+    private func upgradedCoverURL(from raw: String?) -> URL? {
+        guard let raw = raw, !raw.isEmpty else { return nil }
+        var s = raw.replacingOccurrences(of: "http://", with: "https://")
+        if s.contains("books.google") && s.contains("/books/content") {
+            s = s.replacingOccurrences(of: "&edge=curl", with: "")
+            if !s.contains("w=") {
+                s += "&w=800"
+            }
         }
-        return nil
+        return URL(string: s)
     }
 
     // MARK: - Purchase URLs
@@ -86,6 +147,28 @@ struct GoogleBooksResponse: Codable {
 struct GoogleBookItem: Codable {
     let id: String
     let volumeInfo: VolumeInfo
+    let accessInfo: BookAccessInfo?
+}
+
+struct BookAccessInfo: Codable {
+    let publicDomain: Bool?
+    let webReaderLink: String?
+    let epub: BookDownloadAccess?
+}
+
+struct BookDownloadAccess: Codable {
+    let isAvailable: Bool?
+    let downloadLink: String?
+    let acsTokenLink: String?
+}
+
+struct BookReadingResource: Identifiable, Hashable {
+    let id: String
+    let bookID: String
+    let title: String
+    let readerURL: URL
+    let epubDownloadURL: URL?
+    let isPublicDomain: Bool
 }
 
 struct VolumeInfo: Codable {
@@ -98,6 +181,7 @@ struct VolumeInfo: Codable {
     let publishedDate: String?
     let imageLinks: ImageLinks?
     let infoLink: String?
+    let language: String?
 }
 
 struct ImageLinks: Codable {
@@ -135,7 +219,8 @@ extension GoogleBookItem {
             publishedDate: volumeInfo.publishedDate,
             thumbnailURL: volumeInfo.imageLinks?.thumbnailHTTPS,
             largeCoverURL: volumeInfo.imageLinks?.bestQualityHTTPS,
-            infoLink: volumeInfo.infoLink
+            infoLink: volumeInfo.infoLink,
+            epubURL: accessInfo?.epub?.downloadLink
         )
     }
 }

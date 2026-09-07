@@ -10,7 +10,8 @@ final class DiscoveryViewModel: ObservableObject {
     @Published var showPurchaseSheet = false
     @Published var showDetailView = false
     @Published var likeAnimationTrigger = false
-    
+    @Published var dislikeAnimationTrigger = false
+
     var currentBook: Book? {
         guard currentIndex < books.count else { return nil }
         return books[currentIndex]
@@ -31,8 +32,15 @@ final class DiscoveryViewModel: ObservableObject {
     private var seenBookIds: Set<String> = []
     private let booksService = GoogleBooksService.shared
     private let supabaseService = SupabaseService.shared
+    private let engine = RecommendationEngine.shared
     private let prefetchThreshold = 3
-    private var prefetchTask: Task<Void, Never>?
+    private var isFetchingMore = false
+
+    init(seedBooks: [Book] = []) {
+        var seen = Set<String>()
+        books = seedBooks.filter { seen.insert($0.id).inserted }
+        currentIndex = 0
+    }
 
     // MARK: - Load Feed
 
@@ -41,24 +49,25 @@ final class DiscoveryViewModel: ObservableObject {
         error = nil
         books = [] // Clear existing books
 
+        // Seed from the durable on-device signal store so previously seen/disliked
+        // books stay excluded across launches.
+        engine.load()
+        seenBookIds = engine.seenBookIds
+
         do {
-            // In development mode, skip Supabase and use local tracking
-            if let userId = AuthService.shared.currentUserId {
-                do {
-                    seenBookIds = try await supabaseService.fetchSwipedBookIds(userId: userId)
-                } catch {
-                    // Fallback to empty set if Supabase fails (development mode)
-                    seenBookIds = []
-                }
+            // When Supabase auth lands, union in the server's swiped ids too.
+            if let userId = AuthService.shared.currentUserId,
+               let serverSeen = try? await supabaseService.fetchSwipedBookIds(userId: userId) {
+                seenBookIds.formUnion(serverSeen)
             }
-            
+
             try await fetchMoreBooks()
-            
+
             // If no books were loaded from API, use mock books
             if books.isEmpty {
                 books = mockBooks()
             }
-            
+
             currentIndex = 0
         } catch {
             // If Google Books fails, always use mock data to ensure users see content
@@ -70,21 +79,182 @@ final class DiscoveryViewModel: ObservableObject {
         isLoading = false
     }
 
+    func loadFeedIfNeeded() async {
+        guard books.isEmpty else { return }
+        await loadFeed()
+    }
+
     // MARK: - Fetch More Books
 
     private func fetchMoreBooks() async throws {
-        do {
-            let newBooksFromAPI = try await booksService.fetchTrendingBooks(maxResults: 10)
-            let filteredBooks = newBooksFromAPI.filter { !seenBookIds.contains($0.id) }
-            
-            books.append(contentsOf: filteredBooks)
-        } catch {
-            // If we have no books at all, add mock books to prevent empty state
+        // Only one fetch at a time. Rapid like/dislike swiping used to fire several
+        // concurrent fetches that each snapshotted `books` before appending, producing
+        // duplicate IDs in the ForEach and blanking the screen.
+        guard !isFetchingMore else { return }
+        isFetchingMore = true
+        defer { isFetchingMore = false }
+
+        var addedCount = 0
+        var attempts = 0
+        var lastError: Error?
+
+        // Retry with fresh genres until we actually add some books. Strict English
+        // filtering plus seen/disliked exclusions can leave a single fetch nearly
+        // empty, which otherwise strands the user at the end with nothing to scroll.
+        while addedCount < 5 && attempts < 4 {
+            attempts += 1
+            do {
+                let candidates = try await fetchCandidates()
+                let ranked = await engine.rankBySimilarity(candidates)
+
+                // Compute exclusions AFTER the awaits, so anything that entered the
+                // feed meanwhile is still excluded (no duplicate ForEach IDs).
+                let existingIds = Set(books.map { $0.id })
+                let fresh = ranked.filter {
+                    !existingIds.contains($0.id) && !seenBookIds.contains($0.id)
+                }
+
+                // Mix in variety so lower-ranked exploration/modern books surface
+                // instead of being buried by the taste-match ranking, then spread
+                // same-author books apart (the "gap" rule).
+                let mixed = mixExploreExploit(fresh)
+                let diversified = applyAuthorGap(mixed, take: 10)
+                books.append(contentsOf: diversified)
+                addedCount += diversified.count
+            } catch {
+                lastError = error
+            }
+        }
+
+        if addedCount == 0 {
+            // Nothing new — keep content on screen; surface the error only if we have
+            // literally nothing to show.
             if books.isEmpty {
                 books.append(contentsOf: mockBooks())
             }
-            throw error // Re-throw to let caller handle if needed
+            if let lastError = lastError {
+                throw lastError
+            }
         }
+    }
+
+    /// Decides what to fetch: popular rotation during cold start, otherwise a
+    /// mostly on-taste subject with a ~25% exploration fraction to avoid a bubble.
+    private func fetchCandidates() async throws -> [Book] {
+        // Page randomly into results so repeated fetches pull *different* books
+        // instead of the same top ~20 every time (a key cause of running dry).
+        let startIndex = Int.random(in: 0...3) * 20
+
+        // Cold start — popular rotation, a big page.
+        guard engine.hasSignals() else {
+            return try await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 40)
+        }
+
+        // Warm: gather a large, interest-driven pool from several sources at once —
+        // your top genre, a favorite author, exploration, and modern releases.
+        async let genre = genreCandidates(startIndex: startIndex)
+        async let author = authorCandidates()
+        async let exploration = explorationCandidates()
+        async let modern = modernCandidates()
+
+        let combined = await genre + author + exploration + modern
+        var seen = Set<String>()
+        let unique = combined.filter { seen.insert($0.id).inserted }
+
+        if unique.isEmpty { throw GoogleBooksError.noResults }
+        return unique
+    }
+
+    /// Recent, mainstream-friendly books so the feed isn't all older classics.
+    /// Pulls quality (relevance-ranked) results from broad contemporary genres and
+    /// keeps only those published in roughly the last 15 years.
+    private func modernCandidates() async -> [Book] {
+        let modernSubjects = ["fiction", "thriller", "romance", "science fiction", "mystery", "fantasy", "young adult"]
+        let subject = modernSubjects.randomElement() ?? "fiction"
+        let books = (try? await booksService.fetchBooks(subject: subject, startIndex: Int.random(in: 0...2) * 20, maxResults: 40)) ?? []
+        return books.filter { ($0.publicationYear ?? 0) >= 2010 }
+    }
+
+    private func genreCandidates(startIndex: Int) async -> [Book] {
+        if let subject = weightedSubject() {
+            return (try? await booksService.fetchBooks(subject: subject, startIndex: startIndex, maxResults: 40)) ?? []
+        }
+        return (try? await booksService.fetchTrendingBooks(startIndex: startIndex, maxResults: 40)) ?? []
+    }
+
+    private func authorCandidates() async -> [Book] {
+        guard let author = engine.topPositiveAuthors(limit: 3).randomElement() else { return [] }
+        // Keep this modest so a single author can't dominate the candidate pool.
+        return (try? await booksService.fetchByAuthor(author, maxResults: 8)) ?? []
+    }
+
+    private func explorationCandidates() async -> [Book] {
+        (try? await booksService.fetchTrendingBooks(startIndex: Int.random(in: 0...3) * 20, maxResults: 20)) ?? []
+    }
+
+    /// Guarantees variety: keeps the strongest taste-matches on top but shuffles the
+    /// long tail, so exploration/modern books (which rank lower) still break through
+    /// instead of the feed being 100% on-taste classics.
+    private func mixExploreExploit(_ ranked: [Book]) -> [Book] {
+        let exploitCount = 7
+        guard ranked.count > exploitCount else { return ranked }
+        let top = Array(ranked.prefix(exploitCount))
+        let rest = Array(ranked.dropFirst(exploitCount)).shuffled()
+        return top + rest
+    }
+
+    /// Author "gap" rule: skips a candidate whose primary author already appears
+    /// within the last `authorGap` books of the feed, so no single author clusters
+    /// or floods. Deferred books are used only to avoid coming up short.
+    private func applyAuthorGap(_ candidates: [Book], take: Int) -> [Book] {
+        let authorGap = 6
+        var recentAuthors = books.map { $0.primaryAuthor }
+        var picked: [Book] = []
+        var deferred: [Book] = []
+
+        for book in candidates {
+            if recentAuthors.suffix(authorGap).contains(book.primaryAuthor) {
+                deferred.append(book)
+            } else {
+                picked.append(book)
+                recentAuthors.append(book.primaryAuthor)
+                if picked.count >= take { break }
+            }
+        }
+
+        if picked.count < take {
+            picked.append(contentsOf: deferred.prefix(take - picked.count))
+        }
+        return picked
+    }
+
+    /// Picks a broad browse subject from the user's top categories, weighted by
+    /// affinity. Weights use the raw category affinity; the fetch uses its
+    /// canonical (broad) subject form.
+    private func weightedSubject() -> String? {
+        let top = engine.topPositiveCategories(limit: 5)
+        guard !top.isEmpty else { return nil }
+
+        let weights = top.map { max(0.05, engine.affinity(for: $0)) }
+        let total = weights.reduce(0, +)
+        guard total > 0 else { return top.randomElement().map { canonicalSubject(for: $0) } }
+
+        var roll = Double.random(in: 0..<total)
+        for (category, weight) in zip(top, weights) {
+            roll -= weight
+            if roll <= 0 { return canonicalSubject(for: category) }
+        }
+        return top.last.map { canonicalSubject(for: $0) }
+    }
+
+    /// Maps a possibly-granular category (e.g. "Psychological Thriller") to a broad
+    /// subject Google Books browses well (e.g. "thriller").
+    private func canonicalSubject(for category: String) -> String {
+        let lower = category.lowercased()
+        if let match = GoogleBooksService.allSubjects.first(where: { lower.contains($0) }) {
+            return match
+        }
+        return lower.split(separator: " ").first.map(String.init) ?? lower
     }
 
     // MARK: - Index Management
@@ -92,26 +262,27 @@ final class DiscoveryViewModel: ObservableObject {
     func updateCurrentIndex(_ newIndex: Int) {
         guard newIndex >= 0 && newIndex < books.count else { return }
         currentIndex = newIndex
-        
-        // Pre-fetch more books if running low
-        if currentIndex >= books.count - prefetchThreshold {
-            prefetchTask?.cancel()
-            prefetchTask = Task { [weak self] in
-                guard let self = self else { return }
-                try? await self.fetchMoreBooks()
-            }
-        }
+        prefetchIfNeeded()
     }
-    
+
+    /// Kicks off a background fetch when the feed is running low. The
+    /// `isFetchingMore` guard (in fetchMoreBooks) keeps this from stacking up.
+    private func prefetchIfNeeded() {
+        guard currentIndex >= books.count - prefetchThreshold, !isFetchingMore else { return }
+        Task { [weak self] in try? await self?.fetchMoreBooks() }
+    }
+
     private func advanceToNext() {
         if currentIndex < books.count - 1 {
             currentIndex += 1
+            prefetchIfNeeded()
         } else {
-            // At the end, try to load more books
-            Task {
-                try? await fetchMoreBooks()
-                if currentIndex < books.count - 1 {
-                    currentIndex += 1
+            // At the very end, fetch then advance once new books arrive.
+            Task { [weak self] in
+                guard let self = self else { return }
+                try? await self.fetchMoreBooks()
+                if self.currentIndex < self.books.count - 1 {
+                    self.currentIndex += 1
                 }
             }
         }
@@ -129,27 +300,64 @@ final class DiscoveryViewModel: ObservableObject {
     func swipeUp() {
         advanceToNext()
     }
-    
+
     func swipeDown() {
         goToPrevious()
     }
 
-    func doubleTap() {
+    /// Swipe right: positive taste signal, save to Library, and advance.
+    func swipeLike() {
         guard let book = currentBook else { return }
+        triggerLikeAnimation()
+        engine.record(book: book, action: .like)
+        recordSwipe(book: book, action: .like)
+        saveToLibrary(book: book)
+        advanceToNext()
+    }
 
-        // Trigger heart animation
+    /// Swipe left: negative taste signal (won't resurface), and advance.
+    func swipeDislike() {
+        guard let book = currentBook else { return }
+        triggerDislikeAnimation()
+        engine.record(book: book, action: .dislike)
+        recordSwipe(book: book, action: .dislike)
+        advanceToNext()
+    }
+
+    /// Like + save the current book without advancing (used by the detail view's
+    /// Save button, which stays on the book).
+    func likeCurrent() {
+        guard let book = currentBook else { return }
+        triggerLikeAnimation()
+        engine.record(book: book, action: .like)
+        recordSwipe(book: book, action: .like)
+        saveToLibrary(book: book)
+    }
+
+    /// Neutral skip — a mild negative signal recorded when the user swipes up past
+    /// a book without judging it. Keeps it from resurfacing.
+    func skipCurrent() {
+        guard let book = currentBook else { return }
+        engine.record(book: book, action: .skip)
+        seenBookIds.insert(book.id)
+    }
+
+    // MARK: - Feedback Animations
+
+    private func triggerLikeAnimation() {
         likeAnimationTrigger = true
         Task {
             try? await Task.sleep(nanoseconds: UInt64(0.8 * 1_000_000_000))
-            await MainActor.run {
-                likeAnimationTrigger = false
-            }
+            await MainActor.run { self.likeAnimationTrigger = false }
         }
+    }
 
-        // Save to library but don't advance - just show the like animation
-        recordSwipe(book: book, action: .like)
-        saveToLibrary(book: book)
-        // Note: Don't advance to next book on double tap - just save it
+    private func triggerDislikeAnimation() {
+        dislikeAnimationTrigger = true
+        Task {
+            try? await Task.sleep(nanoseconds: UInt64(0.8 * 1_000_000_000))
+            await MainActor.run { self.dislikeAnimationTrigger = false }
+        }
     }
 
 
@@ -180,17 +388,24 @@ final class DiscoveryViewModel: ObservableObject {
     }
 
     private func saveToLibrary(book: Book) {
-        guard let userId = AuthService.shared.currentUserId else { return }
+        let userId = AuthService.shared.currentUserId ?? Self.localUserId
+        // Durable local save (works offline, no backend needed).
+        LibraryStore.shared.add(book: book, userId: userId, status: .wantToRead)
 
+        // Best-effort server sync for when Supabase auth lands.
+        guard let authedId = AuthService.shared.currentUserId else { return }
         Task { [weak self] in
             guard let self = self else { return }
             _ = try? await self.supabaseService.addUserBook(
-                userId: userId,
+                userId: authedId,
                 googleBooksId: book.id,
                 status: .wantToRead
             )
         }
     }
+
+    /// Stable local user id used before real auth exists.
+    private static let localUserId = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
     
     // MARK: - Mock Data (Development)
     
@@ -205,8 +420,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.3,
                 pageCount: 400,
                 publishedDate: "2017-06-13",
-                thumbnailURL: "https://books.google.com/books/content?id=cygWzgEACAAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=cygWzgEACAAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/8354226-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/8354226-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -218,8 +433,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.6,
                 pageCount: 482,
                 publishedDate: "2021-05-04",
-                thumbnailURL: "https://books.google.com/books/content?id=NzjhzQEACAAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=NzjhzQEACAAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/11200092-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/11200092-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -231,8 +446,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.1,
                 pageCount: 368,
                 publishedDate: "2020-09-03",
-                thumbnailURL: "https://books.google.com/books/content?id=XVvGzwEACAAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=XVvGzwEACAAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/10201431-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/10201431-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -244,8 +459,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.7,
                 pageCount: 320,
                 publishedDate: "2018-10-16",
-                thumbnailURL: "https://books.google.com/books/content?id=fFCjDwAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=fFCjDwAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/12539702-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/12539702-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -257,8 +472,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.2,
                 pageCount: 336,
                 publishedDate: "2019-02-05",
-                thumbnailURL: "https://books.google.com/books/content?id=RLV5DwAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=RLV5DwAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/9407338-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/9407338-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -270,8 +485,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.4,
                 pageCount: 334,
                 publishedDate: "2018-02-20",
-                thumbnailURL: "https://books.google.com/books/content?id=2ObWDgAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=2ObWDgAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/8314077-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/8314077-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -283,8 +498,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.0,
                 pageCount: 288,
                 publishedDate: "2020-08-13",
-                thumbnailURL: "https://books.google.com/books/content?id=W2ZDDwAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=W2ZDDwAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/10313767-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/10313767-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -296,8 +511,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.3,
                 pageCount: 688,
                 publishedDate: "1965-08-01",
-                thumbnailURL: "https://books.google.com/books/content?id=B1hSG45JCX4C&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=B1hSG45JCX4C&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/6976407-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/6976407-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -309,8 +524,8 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 3.9,
                 pageCount: 266,
                 publishedDate: "2018-08-28",
-                thumbnailURL: "https://books.google.com/books/content?id=H7GeDAAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=H7GeDAAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/8794265-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/8794265-L.jpg",
                 infoLink: nil
             ),
             Book(
@@ -322,14 +537,10 @@ final class DiscoveryViewModel: ObservableObject {
                 averageRating: 4.5,
                 pageCount: 448,
                 publishedDate: "2018-11-13",
-                thumbnailURL: "https://books.google.com/books/content?id=hi18DwAAQBAJ&printsec=frontcover&img=1&zoom=1",
-                largeCoverURL: "https://books.google.com/books/content?id=hi18DwAAQBAJ&printsec=frontcover&img=1&zoom=3",
+                thumbnailURL: "https://covers.openlibrary.org/b/id/8824664-M.jpg",
+                largeCoverURL: "https://covers.openlibrary.org/b/id/8824664-L.jpg",
                 infoLink: nil
             )
         ]
-    }
-    
-    deinit {
-        prefetchTask?.cancel()
     }
 }

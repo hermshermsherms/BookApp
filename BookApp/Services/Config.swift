@@ -36,6 +36,49 @@ enum Config {
         }
     }
     
+    /// Google Books API configuration
+    enum GoogleBooks {
+        /// Google Books API key, or `nil` if not configured.
+        /// Set `GOOGLE_BOOKS_API_KEY` in the app target's Info settings.
+        static var apiKey: String? {
+            if let key = Bundle.main.object(forInfoDictionaryKey: "GOOGLE_BOOKS_API_KEY") as? String,
+               isUsable(key) {
+                return key
+            }
+
+            let localKey = Secrets.googleBooksAPIKey
+            return isUsable(localKey) ? localKey : nil
+        }
+
+        private static func isUsable(_ key: String) -> Bool {
+            !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !key.hasPrefix("PASTE_YOUR")
+        }
+    }
+
+    /// Anthropic (Claude) configuration, used by the reading buddy.
+    ///
+    /// ⚠️ Development only. A key resolved here ships inside the app binary and
+    /// can be extracted from it. Before releasing, move the call behind a server
+    /// you control (e.g. a Supabase Edge Function) and drop the key from the app.
+    enum Anthropic {
+        /// Anthropic API key, or `nil` if not configured.
+        static var apiKey: String? {
+            if let key = Bundle.main.object(forInfoDictionaryKey: "ANTHROPIC_API_KEY") as? String,
+               isUsable(key) {
+                return key
+            }
+
+            let localKey = Secrets.anthropicAPIKey
+            return isUsable(localKey) ? localKey : nil
+        }
+
+        private static func isUsable(_ key: String) -> Bool {
+            !key.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                && !key.hasPrefix("PASTE_YOUR")
+        }
+    }
+
     /// Apple Sign In configuration
     enum Apple {
         /// Services ID for Apple Sign In (should match your Apple Developer Console configuration)

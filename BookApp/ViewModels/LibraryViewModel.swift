@@ -11,62 +11,58 @@ final class LibraryViewModel: ObservableObject {
     @Published var searchResults: [Book] = []
     @Published var isSearching = false
 
-    private let supabaseService = SupabaseService.shared
+    private let libraryStore = LibraryStore.shared
     private let booksService = GoogleBooksService.shared
+
+    private static let localUserId = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
     // MARK: - Fetch Library
 
     func fetchLibrary() async {
-        guard let userId = AuthService.shared.currentUserId else { return }
-
-        isLoading = true
-        error = nil
-
-        do {
-            let allBooks = try await supabaseService.fetchUserBooks(userId: userId)
-
-            // Enrich each UserBook with Google Books data
-            var enrichedBooks: [UserBook] = []
-            for var userBook in allBooks {
-                if let book = try? await booksService.fetchBookDetails(id: userBook.googleBooksId) {
-                    userBook.book = book
-                }
-                enrichedBooks.append(userBook)
-            }
-
-            wantToReadBooks = enrichedBooks.filter { $0.status == .wantToRead }
-            readingBooks = enrichedBooks.filter { $0.status == .reading }
-            readBooks = enrichedBooks.filter { $0.status == .read }
-        } catch {
-            self.error = error.localizedDescription
-        }
-
-        isLoading = false
+        // Local store is the source of truth — book metadata is stored alongside the
+        // status, so this is instant and works offline.
+        let all = libraryStore.entries
+        wantToReadBooks = all.filter { $0.status == .wantToRead }
+        readingBooks = all.filter { $0.status == .reading }
+        readBooks = all.filter { $0.status == .read }
     }
 
     // MARK: - Update Status
 
     func updateStatus(userBook: UserBook, newStatus: BookStatus) async {
-        do {
-            try await supabaseService.updateBookStatus(bookId: userBook.id, status: newStatus)
-            await fetchLibrary()
-        } catch {
-            self.error = error.localizedDescription
+        libraryStore.updateStatus(id: userBook.id, status: newStatus)
+        // Finishing a book is a strong positive taste signal.
+        if newStatus == .read, let book = userBook.book {
+            RecommendationEngine.shared.record(book: book, action: .like)
         }
+        await fetchLibrary()
     }
 
     // MARK: - Delete Book
 
     func deleteBook(_ userBook: UserBook) async {
-        do {
-            try await supabaseService.deleteUserBook(bookId: userBook.id)
-            await fetchLibrary()
-        } catch {
-            self.error = error.localizedDescription
-        }
+        libraryStore.remove(id: userBook.id)
+        await fetchLibrary()
     }
 
     // MARK: - Search (Manual Add)
+
+    private var searchTask: Task<Void, Never>?
+
+    /// Debounced search — call on every keystroke; runs the query after a short pause.
+    func searchDebounced() {
+        searchTask?.cancel()
+        let trimmed = searchQuery.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else {
+            searchResults = []
+            return
+        }
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            guard !Task.isCancelled else { return }
+            await self?.searchBooks()
+        }
+    }
 
     func searchBooks() async {
         guard !searchQuery.trimmingCharacters(in: .whitespaces).isEmpty else {
@@ -84,19 +80,10 @@ final class LibraryViewModel: ObservableObject {
     }
 
     func addBookToLibrary(book: Book, status: BookStatus = .wantToRead) async {
-        guard let userId = AuthService.shared.currentUserId else { return }
-
-        do {
-            let _ = try await supabaseService.addUserBook(
-                userId: userId,
-                googleBooksId: book.id,
-                status: status
-            )
-            searchQuery = ""
-            searchResults = []
-            await fetchLibrary()
-        } catch {
-            self.error = error.localizedDescription
-        }
+        let userId = AuthService.shared.currentUserId ?? Self.localUserId
+        libraryStore.add(book: book, userId: userId, status: status)
+        searchQuery = ""
+        searchResults = []
+        await fetchLibrary()
     }
 }
