@@ -10,6 +10,15 @@ struct BookDetailView: View {
     @State private var isLoadingSimilar = false
     @Environment(\.dismiss) private var dismiss
 
+    // Driven straight off the store so the shelf menu reflects the book's real
+    // status wherever this sheet is opened from.
+    @ObservedObject private var libraryStore = LibraryStore.shared
+
+    /// This book's library entry, if it's already on a shelf.
+    private var libraryEntry: UserBook? {
+        libraryStore.entries.first { $0.googleBooksId == book.id }
+    }
+
     private var highResImageURL: URL? {
         book.highQualityImageURL
     }
@@ -192,6 +201,9 @@ struct BookDetailView: View {
             .background(Theme.background)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    shelfMenu
+                }
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Button("Done") { dismiss() }
                         .foregroundColor(Theme.accent)
@@ -201,6 +213,56 @@ struct BookDetailView: View {
         .task {
             await loadSimilarBooks()
         }
+    }
+
+    // MARK: - Shelf Menu
+
+    /// Move the book between shelves (or add it to one) without leaving the sheet.
+    private var shelfMenu: some View {
+        Menu {
+            ForEach(BookStatus.allCases, id: \.self) { status in
+                Button {
+                    setStatus(status)
+                } label: {
+                    Label(
+                        status.displayName,
+                        systemImage: libraryEntry?.status == status ? "checkmark" : status.iconName
+                    )
+                }
+            }
+
+            if libraryEntry != nil {
+                Divider()
+
+                Button(role: .destructive, action: removeFromLibrary) {
+                    Label("Remove from Library", systemImage: "trash")
+                }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .foregroundColor(Theme.accent)
+        }
+    }
+
+    private func setStatus(_ status: BookStatus) {
+        if let entry = libraryEntry {
+            guard entry.status != status else { return }
+            libraryStore.updateStatus(id: entry.id, status: status)
+        } else {
+            libraryStore.add(book: book, userId: AuthService.shared.effectiveUserId, status: status)
+        }
+
+        // Finishing a book is a strong positive taste signal, same as it is
+        // from the Library list.
+        if status == .read {
+            RecommendationEngine.shared.record(book: book, action: .like)
+        }
+    }
+
+    private func removeFromLibrary() {
+        guard let entry = libraryEntry else { return }
+        libraryStore.remove(id: entry.id)
+        ReviewStore.shared.remove(googleBooksId: entry.googleBooksId)
     }
 
     // MARK: - Metadata Pill

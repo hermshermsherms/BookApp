@@ -137,7 +137,7 @@ final class SupabaseService {
         return try decoder.decode([Review].self, from: data)
     }
 
-    func upsertReview(userId: UUID, googleBooksId: String, rating: Int, reviewText: String?) async throws -> Review {
+    func upsertReview(userId: UUID, googleBooksId: String, rating: Double, reviewText: String?) async throws -> Review {
         let body: [String: Any?] = [
             "user_id": userId.uuidString,
             "google_books_id": googleBooksId,

@@ -10,7 +10,7 @@ final class ProfileViewModel: ObservableObject {
 
         var id: UUID { userBook.id }
         var book: Book? { userBook.book }
-        var rating: Int { review?.rating ?? 0 }
+        var rating: Double { review?.rating ?? 0 }
         var title: String { userBook.book?.title ?? "Unknown Title" }
     }
 
@@ -80,7 +80,7 @@ final class ProfileViewModel: ObservableObject {
 
     func stats(books: [UserBook], reviews: [Review]) -> Stats {
         let ratings = reviews.map(\.rating)
-        let average = ratings.isEmpty ? nil : Double(ratings.reduce(0, +)) / Double(ratings.count)
+        let average = ratings.isEmpty ? nil : ratings.reduce(0, +) / Double(ratings.count)
 
         return Stats(
             booksRead: books.filter { $0.status == .read }.count,

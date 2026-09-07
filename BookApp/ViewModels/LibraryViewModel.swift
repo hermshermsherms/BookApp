@@ -14,8 +14,6 @@ final class LibraryViewModel: ObservableObject {
     private let libraryStore = LibraryStore.shared
     private let booksService = GoogleBooksService.shared
 
-    private static let localUserId = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
-
     // MARK: - Fetch Library
 
     func fetchLibrary() async {
@@ -83,7 +81,7 @@ final class LibraryViewModel: ObservableObject {
     }
 
     func addBookToLibrary(book: Book, status: BookStatus = .wantToRead) async {
-        let userId = AuthService.shared.currentUserId ?? Self.localUserId
+        let userId = AuthService.shared.effectiveUserId
         libraryStore.add(book: book, userId: userId, status: status)
         searchQuery = ""
         searchResults = []

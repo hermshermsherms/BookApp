@@ -15,15 +15,14 @@ struct ShelfCoverView: View {
                             .resizable()
                             .aspectRatio(contentMode: .fill)
                     default:
+                        // The title sits under the cover now, so a missing
+                        // jacket just shows the placeholder mark.
                         Rectangle()
                             .fill(Theme.parchment)
                             .overlay(
-                                Text(item.title)
-                                    .font(Theme.serifBold(11))
-                                    .foregroundColor(Theme.secondaryText)
-                                    .multilineTextAlignment(.center)
-                                    .lineLimit(4)
-                                    .padding(6)
+                                Image(systemName: "book.closed")
+                                    .font(.system(size: 22))
+                                    .foregroundColor(Theme.muted)
                             )
                     }
                 }
@@ -42,6 +41,13 @@ struct ShelfCoverView: View {
                         .padding(5)
                 }
             }
+
+            Text(item.title)
+                .font(Theme.serifBold(12))
+                .foregroundColor(Theme.primaryText)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, minHeight: 32, alignment: .top)
 
             if item.rating > 0 {
                 StarRatingView(rating: item.rating, size: 10, spacing: 1)
@@ -127,13 +133,7 @@ struct ShelfBookDetailView: View {
 
     private func reviewCard(_ review: Review) -> some View {
         VStack(alignment: .leading, spacing: Theme.paddingMedium) {
-            VStack(alignment: .leading, spacing: 8) {
-                StarRatingView(rating: review.rating, size: 20, spacing: 4)
-
-                Text(review.ratingLabel)
-                    .font(Theme.body(15))
-                    .foregroundColor(Theme.accent)
-            }
+            StarRatingView(rating: review.rating, size: 20, spacing: 4)
 
             if review.hasText, let text = review.reviewText {
                 Divider()

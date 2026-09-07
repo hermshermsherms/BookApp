@@ -1,29 +1,42 @@
 import SwiftUI
 import UIKit
 
-/// Read-only star row. Used anywhere a saved rating is displayed.
+/// Read-only star row, in half-star resolution. Used anywhere a saved rating is
+/// displayed.
 struct StarRatingView: View {
-    let rating: Int
+    let rating: Double
     var size: CGFloat = 13
     var spacing: CGFloat = 2
 
     var body: some View {
         HStack(spacing: spacing) {
             ForEach(1...5, id: \.self) { star in
-                Image(systemName: star <= rating ? "star.fill" : "star")
+                Image(systemName: StarRatingView.symbol(for: star, rating: rating))
                     .font(.system(size: size))
-                    .foregroundColor(star <= rating ? .yellow : Theme.muted.opacity(0.35))
+                    .foregroundColor(rating >= Double(star) - Review.step ? .yellow : Theme.muted.opacity(0.35))
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(rating) out of 5 stars")
+        .accessibilityLabel("\(Review.display(rating)) out of 5 stars")
+    }
+
+    /// Full, half, or empty star for the given position.
+    static func symbol(for star: Int, rating: Double) -> String {
+        if rating >= Double(star) {
+            return "star.fill"
+        }
+        if rating >= Double(star) - Review.step {
+            return "star.leadinghalf.filled"
+        }
+        return "star"
     }
 }
 
-/// Interactive star picker. Tap a star, or drag across the row, to set a rating.
-/// Each new value gives a light haptic tick so rating a book feels physical.
+/// Interactive star picker in half-star steps. Tap a star's left or right half,
+/// or drag across the row. Each new value gives a light haptic tick so rating a
+/// book feels physical.
 struct StarRatingPicker: View {
-    @Binding var rating: Int
+    @Binding var rating: Double
     var size: CGFloat = 36
     var spacing: CGFloat = 12
 
@@ -33,11 +46,11 @@ struct StarRatingPicker: View {
     var body: some View {
         HStack(spacing: spacing) {
             ForEach(1...5, id: \.self) { star in
-                Image(systemName: star <= rating ? "star.fill" : "star")
+                Image(systemName: StarRatingView.symbol(for: star, rating: rating))
                     .font(.system(size: size))
-                    .foregroundColor(star <= rating ? .yellow : Theme.muted.opacity(0.4))
+                    .foregroundColor(rating >= Double(star) - Review.step ? .yellow : Theme.muted.opacity(0.4))
                     .frame(width: size, height: size)
-                    .scaleEffect(star == rating ? 1.18 : 1.0)
+                    .scaleEffect(isNewest(star) ? 1.18 : 1.0)
             }
         }
         .contentShape(Rectangle())
@@ -52,20 +65,27 @@ struct StarRatingPicker: View {
         .animation(.spring(response: 0.25, dampingFraction: 0.6), value: rating)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Rating")
-        .accessibilityValue("\(rating) out of 5 stars")
+        .accessibilityValue("\(Review.display(rating)) out of 5 stars")
         .accessibilityAdjustableAction { direction in
             switch direction {
-            case .increment: rating = min(rating + 1, 5)
-            case .decrement: rating = max(rating - 1, 1)
+            case .increment: rating = min(rating + Review.step, 5)
+            case .decrement: rating = max(rating - Review.step, Review.step)
             @unknown default: break
             }
         }
     }
 
+    /// The star the rating currently lands on, which gets the pop of scale.
+    private func isNewest(_ star: Int) -> Bool {
+        rating > Double(star) - 1 && rating <= Double(star)
+    }
+
     private func setRating(atX x: CGFloat) {
-        let star = min(max(Int(x / stride) + 1, 1), 5)
-        guard star != rating else { return }
-        rating = star
+        // Round up so the half a finger is over is the half that fills.
+        let raw = (Double(x / stride) / Review.step).rounded(.up) * Review.step
+        let stepped = min(max(raw, Review.step), 5)
+        guard stepped != rating else { return }
+        rating = stepped
         UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 }

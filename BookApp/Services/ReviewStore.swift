@@ -46,30 +46,20 @@ final class ReviewStore: ObservableObject {
         reviews.first { $0.googleBooksId == googleBooksId }
     }
 
-    func rating(forGoogleBooksId googleBooksId: String) -> Int? {
-        review(forGoogleBooksId: googleBooksId)?.rating
-    }
-
-    /// Mean star rating across every rated book, or `nil` if nothing is rated yet.
-    var averageRating: Double? {
-        guard !reviews.isEmpty else { return nil }
-        let total = reviews.reduce(0) { $0 + $1.rating }
-        return Double(total) / Double(reviews.count)
-    }
-
     // MARK: - Mutations
 
     /// Saves a rating (and optional review text), replacing any existing review
-    /// for the same book.
+    /// for the same book. The rating is snapped to a valid half-star value.
     @discardableResult
-    func upsert(userId: UUID, googleBooksId: String, rating: Int, reviewText: String?) -> Review {
+    func upsert(userId: UUID, googleBooksId: String, rating: Double, reviewText: String?) -> Review {
         let trimmed = reviewText?.trimmingCharacters(in: .whitespacesAndNewlines)
         let text = (trimmed?.isEmpty == false) ? trimmed : nil
+        let snapped = Review.snap(rating)
         let now = Date()
 
         if let index = reviews.firstIndex(where: { $0.googleBooksId == googleBooksId }) {
             var updated = reviews[index]
-            updated.rating = rating
+            updated.rating = snapped
             updated.reviewText = text
             updated.updatedAt = now
             reviews.remove(at: index)
@@ -82,7 +72,7 @@ final class ReviewStore: ObservableObject {
             id: UUID(),
             userId: userId,
             googleBooksId: googleBooksId,
-            rating: rating,
+            rating: snapped,
             reviewText: text,
             createdAt: now,
             updatedAt: now

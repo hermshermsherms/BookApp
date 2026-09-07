@@ -348,7 +348,7 @@ class ProfileShelfTests: XCTestCase {
         return userBook
     }
 
-    private func makeReview(bookId: String, rating: Int, text: String? = nil) -> Review {
+    private func makeReview(bookId: String, rating: Double, text: String? = nil) -> Review {
         Review(
             id: UUID(),
             userId: userId,
@@ -377,11 +377,11 @@ class ProfileShelfTests: XCTestCase {
     func testShelfJoinsReviewsToBooks() {
         let viewModel = ProfileViewModel()
         let books = [makeUserBook(id: "a", title: "Finished", status: .read, finishedAt: Date())]
-        let reviews = [makeReview(bookId: "a", rating: 4, text: "Loved the ending.")]
+        let reviews = [makeReview(bookId: "a", rating: 3.5, text: "Loved the ending.")]
 
         let shelf = viewModel.shelf(books: books, reviews: reviews)
 
-        XCTAssertEqual(shelf.first?.rating, 4)
+        XCTAssertEqual(shelf.first?.rating, 3.5)
         XCTAssertEqual(shelf.first?.review?.hasText, true)
     }
 
@@ -395,13 +395,14 @@ class ProfileShelfTests: XCTestCase {
             makeUserBook(id: "b", title: "Apple", status: .read, finishedAt: recent),
         ]
         let reviews = [
-            makeReview(bookId: "a", rating: 5),
-            makeReview(bookId: "b", rating: 2),
+            makeReview(bookId: "a", rating: 4.5),
+            makeReview(bookId: "b", rating: 4.0),
         ]
 
         viewModel.sort = .recent
         XCTAssertEqual(viewModel.shelf(books: books, reviews: reviews).map(\.title), ["Apple", "Zebra"])
 
+        // Half a star is enough to separate them.
         viewModel.sort = .rating
         XCTAssertEqual(viewModel.shelf(books: books, reviews: reviews).map(\.title), ["Zebra", "Apple"])
 
@@ -417,8 +418,8 @@ class ProfileShelfTests: XCTestCase {
             makeUserBook(id: "c", title: "Three", status: .wantToRead, finishedAt: Date()),
         ]
         let reviews = [
-            makeReview(bookId: "a", rating: 5),
-            makeReview(bookId: "b", rating: 2),
+            makeReview(bookId: "a", rating: 4.5),
+            makeReview(bookId: "b", rating: 2.0),
         ]
 
         let stats = viewModel.stats(books: books, reviews: reviews)
@@ -426,7 +427,7 @@ class ProfileShelfTests: XCTestCase {
         XCTAssertEqual(stats.booksRead, 2)
         XCTAssertEqual(stats.reviewsWritten, 2)
         XCTAssertEqual(stats.totalBooks, 3)
-        XCTAssertEqual(stats.averageRating ?? 0, 3.5, accuracy: 0.001)
+        XCTAssertEqual(stats.averageRating ?? 0, 3.25, accuracy: 0.001)
     }
 
     func testStatsAverageIsNilWithoutReviews() {
@@ -435,9 +436,79 @@ class ProfileShelfTests: XCTestCase {
 
         XCTAssertNil(viewModel.stats(books: books, reviews: []).averageRating)
     }
+}
 
-    func testRatingLabels() {
-        XCTAssertEqual(Review.label(forRating: 0), "Tap a star to rate")
-        XCTAssertEqual(Review.label(forRating: 5), "A new favorite")
+// MARK: - Half Star Rating Tests
+
+class HalfStarRatingTests: XCTestCase {
+
+    func testSnapRoundsToNearestHalfAndClamps() {
+        XCTAssertEqual(Review.snap(3.24), 3.0)
+        XCTAssertEqual(Review.snap(3.26), 3.5)
+        XCTAssertEqual(Review.snap(0), 0.5)
+        XCTAssertEqual(Review.snap(-2), 0.5)
+        XCTAssertEqual(Review.snap(9), 5.0)
+    }
+
+    func testRatingValidity() {
+        let base = Review(
+            id: UUID(),
+            userId: UUID(),
+            googleBooksId: "a",
+            rating: 3.5,
+            reviewText: nil,
+            createdAt: Date(),
+            updatedAt: Date()
+        )
+
+        XCTAssertTrue(base.isValid)
+
+        var quarterStar = base
+        quarterStar.rating = 3.25
+        XCTAssertFalse(quarterStar.isValid)
+
+        var tooHigh = base
+        tooHigh.rating = 5.5
+        XCTAssertFalse(tooHigh.isValid)
+
+        var unrated = base
+        unrated.rating = 0
+        XCTAssertFalse(unrated.isValid)
+    }
+
+    func testDisplayTrimsWholeNumbers() {
+        XCTAssertEqual(Review.display(4), "4")
+        XCTAssertEqual(Review.display(4.5), "4.5")
+    }
+
+    func testSymbolPerStarPosition() {
+        // A 3.5 rating: three full, one half, one empty.
+        let symbols = (1...5).map { StarRatingView.symbol(for: $0, rating: 3.5) }
+        XCTAssertEqual(symbols, [
+            "star.fill",
+            "star.fill",
+            "star.fill",
+            "star.leadinghalf.filled",
+            "star",
+        ])
+    }
+
+    /// Ratings written before half stars existed were whole-number JSON values.
+    func testWholeNumberRatingStillDecodes() throws {
+        let json = """
+        {
+            "id": "\(UUID().uuidString)",
+            "user_id": "\(UUID().uuidString)",
+            "google_books_id": "abc",
+            "rating": 4,
+            "created_at": 0,
+            "updated_at": 0
+        }
+        """.data(using: .utf8)!
+
+        let review = try JSONDecoder().decode(Review.self, from: json)
+
+        XCTAssertEqual(review.rating, 4.0)
+        XCTAssertTrue(review.isValid)
     }
 }

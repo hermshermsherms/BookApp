@@ -30,7 +30,8 @@ CREATE TABLE reviews (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     google_books_id TEXT NOT NULL,
-    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5),
+    -- Half-star resolution: 0.5 through 5.0 in 0.5 steps.
+    rating NUMERIC(2,1) NOT NULL CHECK (rating >= 0.5 AND rating <= 5 AND (rating * 2) = FLOOR(rating * 2)),
     review_text TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),

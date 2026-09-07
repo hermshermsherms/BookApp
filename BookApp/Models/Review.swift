@@ -5,7 +5,9 @@ struct Review: Identifiable, Codable, Equatable {
     let id: UUID
     let userId: UUID
     let googleBooksId: String
-    var rating: Int // 1-5
+    /// 0.5 to 5, in half-star steps. Stored as a Double so half stars survive a
+    /// round trip; whole-number ratings written before half stars decode as-is.
+    var rating: Double
     var reviewText: String?
     let createdAt: Date
     var updatedAt: Date
@@ -21,7 +23,7 @@ struct Review: Identifiable, Codable, Equatable {
     }
 
     var isValid: Bool {
-        rating >= 1 && rating <= 5
+        rating >= Review.step && rating <= 5 && (rating / Review.step).truncatingRemainder(dividingBy: 1) == 0
     }
 
     /// Whether the user wrote something beyond the star rating.
@@ -30,20 +32,22 @@ struct Review: Identifiable, Codable, Equatable {
         return !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
-    /// Plain-English label for a star count, shown next to the picker so the
-    /// rating reads as an opinion rather than a number.
-    static func label(forRating rating: Int) -> String {
-        switch rating {
-        case 1: return "Not for me"
-        case 2: return "It was okay"
-        case 3: return "Good read"
-        case 4: return "Really liked it"
-        case 5: return "A new favorite"
-        default: return "Tap a star to rate"
-        }
+    /// The smallest rating increment — half a star.
+    static let step: Double = 0.5
+
+    /// Snaps an arbitrary value to the nearest valid half-star rating.
+    static func snap(_ value: Double) -> Double {
+        min(max((value / step).rounded() * step, step), 5)
     }
 
-    var ratingLabel: String {
-        Review.label(forRating: rating)
+    /// "4" or "3.5" — trailing ".0" trimmed so whole ratings read cleanly.
+    static func display(_ rating: Double) -> String {
+        rating.truncatingRemainder(dividingBy: 1) == 0
+            ? String(Int(rating))
+            : String(format: "%.1f", rating)
+    }
+
+    var ratingDisplay: String {
+        Review.display(rating)
     }
 }

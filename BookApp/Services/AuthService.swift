@@ -9,6 +9,13 @@ final class AuthService: ObservableObject {
     @Published var displayName: String?
     @Published var isAuthenticated = false
 
+    /// Owner id for on-device data written before sign-in. Keeping it stable
+    /// means a local library and its reviews stay attached to one identity.
+    static let localUserId = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
+
+    /// The signed-in user, falling back to the local identity.
+    var effectiveUserId: UUID { currentUserId ?? Self.localUserId }
+
     private let supabaseURL: String
     private let supabaseAnonKey: String
     private let session: URLSession
@@ -185,7 +192,7 @@ final class AuthService: ObservableObject {
     #if DEBUG
     /// Sign in as a demo user for development testing
     func signInAsDemoUser() {
-        let demoUserId = UUID(uuidString: "00000000-0000-0000-0000-000000000001") ?? UUID()
+        let demoUserId = Self.localUserId
         let demoDisplayName = "Demo User"
         let demoAccessToken = "demo_access_token"
         

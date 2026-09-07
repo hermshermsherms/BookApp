@@ -6,7 +6,7 @@ import UIKit
 struct ReviewView: View {
     let userBook: UserBook
 
-    @State private var rating: Int = 0
+    @State private var rating: Double = 0
     @State private var reviewText: String = ""
     @State private var existingReview: Review?
     @State private var showDeleteConfirmation = false
@@ -101,11 +101,6 @@ struct ReviewView: View {
                 .foregroundColor(Theme.primaryText)
 
             StarRatingPicker(rating: $rating)
-
-            Text(Review.label(forRating: rating))
-                .font(Theme.body(15))
-                .foregroundColor(rating == 0 ? Theme.muted : Theme.accent)
-                .animation(.easeInOut(duration: 0.15), value: rating)
         }
         .padding(.horizontal)
     }
